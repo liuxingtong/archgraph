@@ -1081,7 +1081,7 @@ def ai_search(req: InspirationQuery):
 
 严格按以下JSON格式返回：
 
-{
+{{
   "matched_cases": [
     {{"name": "知识图谱中匹配的案例名称", "reason": "为什么这个案例与需求相关"}}
   ],
@@ -1090,7 +1090,7 @@ def ai_search(req: InspirationQuery):
   ],
   "design_insights": ["设计策略建议1", "设计策略建议2", "设计策略建议3"],
   "extended_tags": ["可继续探索的概念1", "概念2", "概念3"]
-}
+}}
 
 **重要**：
 - new_suggestions 中的每个案例必须是真实存在的建筑项目
