@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 环境变量
+.env
+.env.local
+
+# 数据文件（运行时生成）
+data.json
+tags.json
+concepts.json
+nebulas.json
+history.json
+archgraph.db
+*.db
+
+# 快照和导出文件
+snapshots/*.json
+*.csv
+*.graphml
+
+# 上传的文件
+static/uploads/*
+!static/uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# 开发提示文件
+DEVELOPMENT.md
+IMPROVEMENTS.md
+RESUME_PROJECT.md

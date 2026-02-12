@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArchGraph · 建筑灵感知识图谱</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#1a1a1e;--bg-elevated:#222226;--bg-hover:#2a2a2e;--border:rgba(255,255,255,0.06);--border-hover:rgba(255,255,255,0.12);--text-primary:#e8e4df;--text-secondary:#9a958e;--text-muted:#5c584f;--accent:#D4A853;--accent-dim:rgba(212,168,83,0.15);--purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);--green:#7dd3a0;--green-dim:rgba(125,211,160,0.12);--serif:'Playfair Display',Georgia,serif;--sans:'Inter','Noto Sans SC',-apple-system,sans-serif}
+    :root[data-theme="light"]{--bg:#ffffff;--bg-elevated:#f8f8f8;--bg-hover:#f0f0f0;--border:rgba(0,0,0,0.08);--border-hover:rgba(0,0,0,0.15);--text-primary:#1a1a1e;--text-secondary:#4a4a4e;--text-muted:#8a8a8e;--accent:#1a1a1e;--accent-dim:rgba(26,26,30,0.1);--purple:#dc2626;--purple-dim:rgba(220,38,38,0.1);--green:#16a34a;--green-dim:rgba(22,163,74,0.1)}
+    :root[data-theme="light"] body::before{opacity:.02}
+    :root[data-theme="light"] .panel{background:rgba(255,255,255,.95);box-shadow:0 16px 64px rgba(0,0,0,.15)}
+    :root[data-theme="light"] #tooltip{background:rgba(255,255,255,.98)}
+    :root[data-theme="light"] .btn-primary{background:var(--accent);color:#ffffff}
+    :root[data-theme="light"] .btn-primary:hover{background:#333333}
+    :root[data-theme="light"] .input{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.08)}
+    :root[data-theme="light"] .input:focus{border-color:rgba(0,0,0,.2)}
+    :root[data-theme="light"] .btn-ghost{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.08)}
+    :root[data-theme="light"] .btn-ghost:hover{background:rgba(0,0,0,.08)}
+    :root[data-theme="light"] .tag{background:rgba(0,0,0,.04);border-color:transparent}
+    :root[data-theme="light"] .tag:hover{background:rgba(0,0,0,.08)}
+    :root[data-theme="light"] .tag.active{background:var(--accent-dim);border-color:rgba(0,0,0,.15);color:var(--accent)}
+    :root[data-theme="light"] .close-btn:hover{background:rgba(0,0,0,.06)}
+    :root[data-theme="light"] .result-card{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.08)}
+    :root[data-theme="light"] .result-card:hover{border-color:rgba(0,0,0,.15)}
+    :root[data-theme="light"] .case-item{border-bottom-color:rgba(0,0,0,.08)}
+    :root[data-theme="light"] .pick-item:hover{background:rgba(0,0,0,.03)}
+    :root[data-theme="light"] .img-upload-area{border-color:rgba(0,0,0,.15)}
+    :root[data-theme="light"] .img-upload-area:hover{border-color:var(--accent)}
+    :root[data-theme="light"] .img-upload-area.dragging{background:var(--accent-dim)}
+    :root[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15)}
+    :root[data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25)}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--sans);background:var(--bg);color:var(--text-primary);overflow:hidden;font-size:13px;line-height:1.6}
+    body::before{content:'';position:fixed;inset:0;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none}
+    #graph-container{position:fixed;inset:0;z-index:1}svg{width:100%;height:100%}
+    .panel{position:fixed;z-index:10;background:rgba(26,26,30,.88);backdrop-filter:blur(24px) saturate(1.2);border:1px solid var(--border);border-radius:4px;box-shadow:0 16px 64px rgba(0,0,0,.5)}
+    .panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .panel-header-title{font-family:var(--serif);font-size:16px;font-weight:400;letter-spacing:.3px}
+    .panel-body{padding:20px 24px;overflow-y:auto}
+    #sidebar{top:24px;left:24px;bottom:24px;width:340px;display:flex;flex-direction:column}
+    #sidebar .panel-body{flex:1;overflow-y:auto}
+    #detail-panel{top:24px;right:24px;width:400px;max-height:calc(100vh - 48px);display:none}
+    #detail-panel .panel-body{max-height:calc(100vh - 120px)}
+    #search-panel{top:24px;right:24px;width:400px;max-height:calc(100vh - 48px);display:none}
+    #search-panel .panel-body{max-height:calc(100vh - 120px)}
+    #hybrid-panel{top:24px;right:24px;width:420px;max-height:calc(100vh - 48px);display:none}
+    #hybrid-panel .panel-body{max-height:calc(100vh - 120px)}
+    .brand-area{padding:24px 24px 8px}.brand{font-family:var(--serif);font-size:22px;font-weight:400;letter-spacing:.5px;color:var(--text-primary)}.brand em{font-style:italic;color:var(--accent)}.brand-sub{font-size:11px;color:var(--text-muted);margin-top:4px;letter-spacing:2px;text-transform:uppercase}
+    .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-top:16px}
+    .tab{padding:12px 16px;font-size:12px;cursor:pointer;color:var(--text-muted);border-bottom:1.5px solid transparent;transition:all .25s;letter-spacing:.5px}.tab:hover{color:var(--text-secondary)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .input{width:100%;padding:11px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:3px;color:var(--text-primary);font-size:13px;font-family:var(--sans);outline:none;transition:border .25s}.input:focus{border-color:rgba(212,168,83,.4)}.input::placeholder{color:var(--text-muted)}textarea.input{resize:vertical;min-height:72px;line-height:1.7}
+    .btn{padding:10px 20px;border-radius:3px;font-size:12px;font-weight:500;cursor:pointer;transition:all .25s;border:none;display:inline-flex;align-items:center;gap:7px;letter-spacing:.5px}
+    .btn-primary{background:var(--accent);color:#1a1a1e}.btn-primary:hover{background:#e0b560}.btn-primary:disabled{opacity:.3;cursor:default}
+    .btn-ghost{background:rgba(255,255,255,.04);color:var(--text-secondary);border:1px solid var(--border)}.btn-ghost:hover{background:rgba(255,255,255,.07);color:var(--text-primary)}
+    .btn-success{background:var(--green-dim);color:var(--green)}.btn-success:hover{background:rgba(125,211,160,.2)}
+    .btn-danger{background:rgba(220,80,70,.12);color:#e06560}.btn-danger:hover{background:rgba(220,80,70,.2)}
+    .btn-sm{padding:6px 14px;font-size:11px}
+    .tag{display:inline-block;padding:3px 10px;border-radius:2px;font-size:11px;letter-spacing:.3px;background:rgba(255,255,255,.04);color:var(--text-secondary);margin:2px 3px;cursor:pointer;transition:all .2s;border:1px solid transparent}.tag:hover{background:rgba(255,255,255,.08);color:var(--text-primary)}.tag.active{background:var(--accent-dim);border-color:rgba(212,168,83,.3);color:var(--accent)}
+    .case-item{padding:14px 0;cursor:pointer;transition:all .2s;border-bottom:1px solid var(--border)}.case-item:hover{padding-left:8px}.case-item:last-child{border-bottom:none}.case-name{font-weight:500;font-size:14px;margin-bottom:2px}.case-meta{color:var(--text-muted);font-size:12px}
+    .spinner{width:18px;height:18px;border:1.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
+    .result-card{padding:16px;border-radius:3px;background:rgba(255,255,255,.02);border:1px solid var(--border);margin-bottom:10px;transition:border-color .2s}.result-card:hover{border-color:var(--border-hover)}
+    #tooltip{position:fixed;z-index:100;background:rgba(26,26,30,.95);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:3px;padding:14px 18px;font-size:12px;pointer-events:none;opacity:0;transition:opacity .15s;max-width:280px;line-height:1.7}
+    .close-btn{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:transparent;color:var(--text-muted);font-size:18px;transition:all .2s;margin-left:auto;border:none}.close-btn:hover{background:rgba(255,255,255,.06);color:var(--text-primary)}
+    .case-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:2px;font-size:12px;margin:3px;background:var(--purple-dim);border:1px solid rgba(167,139,250,.2);color:var(--purple)}.case-chip .remove{cursor:pointer;opacity:.5;font-size:13px}.case-chip .remove:hover{opacity:1}
+    .dim-btn{padding:7px 14px;border-radius:2px;font-size:11px;cursor:pointer;letter-spacing:.5px;background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--text-muted);transition:all .2s}.dim-btn:hover{border-color:var(--border-hover);color:var(--text-secondary)}.dim-btn.active{background:var(--purple-dim);border-color:rgba(167,139,250,.3);color:var(--purple)}
+    .pick-item{padding:9px 10px;border-radius:3px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px;transition:background .15s}.pick-item:hover{background:rgba(255,255,255,.03)}.pick-item .check{width:16px;height:16px;border-radius:2px;border:1.5px solid var(--border-hover);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;transition:all .15s}.pick-item.selected .check{background:var(--purple);border-color:var(--purple);color:white}
+    .extract-card{padding:14px;border-radius:3px;margin-bottom:8px;background:var(--purple-dim);border:1px solid rgba(167,139,250,.1)}
+    .dim-label{display:inline-block;padding:2px 8px;border-radius:2px;font-size:10px;background:rgba(167,139,250,.12);color:var(--purple);margin:2px 3px 2px 0;letter-spacing:.3px}
+    .section-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}.section-label-accent{color:var(--accent)}.section-label-purple{color:var(--purple)}.section-label-green{color:var(--green)}
+    .import-box{padding:16px;border-radius:3px;background:rgba(255,255,255,.02);border:1px solid var(--border);margin-bottom:20px}
+    .stats-bar{padding:12px 24px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;letter-spacing:.5px}
+    .edit-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .edit-row label{font-size:11px;color:var(--text-muted);min-width:50px;flex-shrink:0}
+    .edit-row .input{flex:1}
+    .img-upload-area{border:2px dashed var(--border);border-radius:4px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:12px}
+    .img-upload-area:hover{border-color:var(--accent)}
+    .img-upload-area.dragging{border-color:var(--accent);background:var(--accent-dim)}
+    ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.15)}
+    #theme-toggle{position:fixed;top:24px;right:24px;z-index:100;width:40px;height:40px;border-radius:50%;background:rgba(26,26,30,.88);backdrop-filter:blur(24px);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .25s;color:var(--text-secondary);box-shadow:0 4px 16px rgba(0,0,0,.2)}#theme-toggle:hover{background:rgba(26,26,30,.95);color:var(--text-primary);border-color:var(--border-hover);transform:scale(1.05)}#theme-toggle svg{width:20px;height:20px}
+    :root[data-theme="light"] #theme-toggle{background:rgba(255,255,255,.95);box-shadow:0 4px 16px rgba(0,0,0,.1)}
+    :root[data-theme="light"] #theme-toggle:hover{background:rgba(255,255,255,1)}
+  </style>
+</head>
+<body>
+<div id="tooltip"></div>
+<div id="theme-toggle" onclick="toggleTheme()" title="切换主题">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <g id="theme-icon-sun" style="display:none">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/>
+      <line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/>
+      <line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </g>
+    <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+</div>
+<div id="graph-container"><svg id="graph-svg"></svg></div>
+
+<div id="sidebar" class="panel">
+  <div class="brand-area"><div class="brand">Arch<em>Graph</em></div><div class="brand-sub">建筑灵感知识图谱</div></div>
+  <div class="tabs">
+    <div class="tab active" data-tab="search" onclick="switchTab('search')">灵感搜索</div>
+    <div class="tab" data-tab="hybrid" onclick="switchTab('hybrid')">方案融合</div>
+    <div class="tab" data-tab="add" onclick="switchTab('add')">添加案例</div>
+    <div class="tab" data-tab="nebula" onclick="switchTab('nebula')">星云管理</div>
+    <div class="tab" data-tab="tags" onclick="switchTab('tags')">标签管理</div>
+    <div class="tab" data-tab="data" onclick="switchTab('data')">数据管理</div>
+    <div class="tab" data-tab="list" onclick="switchTab('list')">全部</div>
+  </div>
+  <div class="panel-body">
+    <div id="tab-search">
+      <div style="margin-bottom:14px"><textarea class="input" id="search-input" rows="3" placeholder="描述你的设计需求或探索方向…&#10;例如：滨水社区空间，低成本改造，强调社区参与"></textarea></div>
+      <div id="active-tags" style="margin-bottom:12px"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="doSearch()">灵感搜索</button>
+      <div id="search-loading" style="display:none;text-align:center;padding:24px"><div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted);font-size:12px">正在搜索灵感…</div></div>
+      <div style="margin-top:20px"><div class="section-label">标签云</div><div id="tag-cloud"></div></div>
+    </div>
+    <div id="tab-hybrid" style="display:none">
+      <div style="padding:14px;border-radius:3px;background:var(--purple-dim);border:1px solid rgba(167,139,250,.1);margin-bottom:18px"><div style="font-size:12px;color:var(--purple);line-height:1.7">选择 2–4 个案例，为每个案例指定融合维度</div></div>
+      <div class="section-label section-label-purple">已选案例 <span id="hybrid-count" style="color:var(--text-muted)">（点击选择）</span></div>
+      <div id="hybrid-selected" style="margin-bottom:16px;min-height:36px"></div>
+      <div id="hybrid-pick-list" style="max-height:130px;overflow-y:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:3px;padding:4px"></div>
+      <div class="section-label section-label-purple">为每个案例选择融合维度</div>
+      <div id="case-dimensions" style="margin-bottom:16px"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="doHybridize()" id="hybrid-btn" disabled>生成融合方案</button>
+      <div id="hybrid-loading" style="display:none;text-align:center;padding:24px"><div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted);font-size:12px">重组设计 DNA…</div></div>
+    </div>
+    <div id="tab-add" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:8px">
+        <button class="btn btn-ghost" id="add-mode-case" onclick="switchAddMode('case')" style="flex:1;border-bottom:2px solid var(--accent);padding-bottom:4px;font-size:13px">添加案例</button>
+        <button class="btn btn-ghost" id="add-mode-concept" onclick="switchAddMode('concept')" style="flex:1;border-bottom:2px solid transparent;padding-bottom:4px;font-size:13px">添加元概念</button>
+      </div>
+      <div id="add-case-form">
+        <div class="import-box">
+          <div class="section-label section-label-accent">从链接导入</div>
+          <input class="input" id="import-url" placeholder="粘贴 ArchDaily / 谷德 / gooood 链接" style="margin-bottom:8px">
+          <input class="input" id="import-notes" placeholder="备注（可选）" style="margin-bottom:10px">
+          <button class="btn btn-primary" style="width:100%" onclick="importURL()">AI 自动提取</button>
+          <div id="import-loading" style="display:none;text-align:center;padding:12px"><div class="spinner"></div><span style="color:var(--text-muted);font-size:11px;margin-left:8px">正在分析…</span></div>
+        </div>
+        <div class="section-label">手动添加</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input class="input" id="add-name" placeholder="项目名称 *">
+          <input class="input" id="add-architect" placeholder="建筑师 / 事务所">
+          <div style="display:flex;gap:8px"><input class="input" id="add-year" placeholder="年份" style="width:35%"><input class="input" id="add-location" placeholder="地点" style="width:65%"></div>
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">标签选择（可多选）</div><input class="input" id="add-tag-search" placeholder="搜索标签…" oninput="renderTagSelector()" style="margin-bottom:6px"><div id="add-tag-selector" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:6px;background:rgba(255,255,255,.02)"></div><input class="input" id="add-tags" placeholder="或手动输入标签（逗号分隔）" style="margin-top:8px"></div>
+          <textarea class="input" id="add-desc" placeholder="设计亮点（核心策略、空间特点）"></textarea>
+          <div class="img-upload-area" id="img-upload-area" onclick="document.getElementById('hidden-file-input').click()">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">点击上传图片</div>
+            <div style="font-size:10px;color:var(--text-muted)">或拖拽图片到此处</div>
+            <img id="img-preview" style="max-width:100%;max-height:150px;margin-top:8px;border-radius:3px;display:none">
+          </div>
+          <input class="input" id="add-image" placeholder="或输入图片链接" style="display:none">
+          <input class="input" id="add-source" placeholder="来源链接（可选）">
+          <button class="btn btn-primary" style="width:100%" onclick="addCase()">添加到图谱</button>
+        </div>
+      </div>
+      <div id="add-concept-form" style="display:none">
+        <div class="import-box">
+          <div class="section-label section-label-accent">从链接导入</div>
+          <input class="input" id="concept-import-url" placeholder="粘贴任意网页链接（不限于建筑网站）" style="margin-bottom:8px">
+          <input class="input" id="concept-import-notes" placeholder="备注（可选）" style="margin-bottom:10px">
+          <button class="btn btn-primary" style="width:100%" onclick="importConceptURL()">AI 自动提取</button>
+          <div id="concept-import-loading" style="display:none;text-align:center;padding:12px"><div class="spinner"></div><span style="color:var(--text-muted);font-size:11px;margin-left:8px">正在分析…</span></div>
+        </div>
+        <div class="section-label">手动添加</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input class="input" id="concept-name" placeholder="概念名称 *">
+          <input class="input" id="concept-keywords" placeholder="关键词（逗号分隔，如：模糊边界、空间渗透、透明性）">
+          <textarea class="input" id="concept-desc" placeholder="概念描述（核心内容、应用场景、意义）"></textarea>
+          <div class="img-upload-area" id="concept-img-upload-area" onclick="document.getElementById('concept-hidden-file-input').click()">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">点击上传图片</div>
+            <div style="font-size:10px;color:var(--text-muted)">或拖拽图片到此处</div>
+            <img id="concept-img-preview" style="max-width:100%;max-height:150px;margin-top:8px;border-radius:3px;display:none">
+          </div>
+          <input class="input" id="concept-image" placeholder="或输入图片链接" style="display:none">
+          <input class="input" id="concept-source" placeholder="来源链接（可选）">
+          <button class="btn btn-primary" style="width:100%" onclick="addConcept()">添加到图谱</button>
+        </div>
+      </div>
+    </div>
+    <div id="tab-tags" style="display:none">
+      <div class="section-label section-label-accent">创建新连接</div>
+      <div style="padding:10px;border-radius:3px;background:var(--purple-dim);border:1px solid rgba(167,139,250,.1);margin-bottom:14px"><div style="font-size:11px;color:var(--purple);line-height:1.7">选择父节点，再选择子节点：可输入新标签名创建新节点，或从现有标签中多选，将子节点连接到所选父节点</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">选择父节点（可多选）</div><input class="input" id="tag-parent-search" placeholder="搜索标签…" oninput="filterTagParentList()" style="margin-bottom:6px"><div id="tag-parent-multi" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:4px;background:rgba(255,255,255,.02)"></div><div id="tag-parent-selected" style="margin-top:8px"></div></div>
+        <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">新标签名称（可选，用于新建节点）</div><input class="input" id="tag-name" placeholder="输入名称则创建新标签并连接"></div>
+        <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">或选择要连接的现有标签（可多选）</div><input class="input" id="tag-child-search" placeholder="搜索标签…" oninput="filterChildTagList()" style="margin-bottom:6px"><div id="tag-child-multi" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:4px;background:rgba(255,255,255,.02)"></div><div id="tag-child-selected" style="margin-top:8px"></div></div>
+        <button class="btn btn-primary" style="width:100%" onclick="createConnection()">创建连接</button>
+      </div>
+    </div>
+    <div id="tab-nebula" style="display:none">
+      <div style="margin-bottom:16px">
+        <div class="section-label section-label-accent">新建星云</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input class="input" id="nebula-name" placeholder="星云名称 *" style="flex:1">
+          <button class="btn btn-primary" onclick="createNebula()">创建</button>
+        </div>
+      </div>
+      <div class="section-label">星云列表</div>
+      <input class="input" id="nebula-search" placeholder="搜索星云…" oninput="renderNebulaList()" style="margin-bottom:12px">
+      <div id="nebula-list" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+    <div id="tab-data" style="display:none">
+      <div class="section-label section-label-accent">数据导出</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        <button class="btn btn-primary" onclick="exportData('json')">导出 JSON（完整数据）</button>
+        <button class="btn btn-primary" onclick="exportData('csv')">导出 CSV（案例表格）</button>
+        <button class="btn btn-primary" onclick="exportData('graphml')">导出 GraphML（图谱数据）</button>
+      </div>
+      <div class="section-label section-label-accent">数据导入</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event)">
+        <button class="btn btn-primary" onclick="document.getElementById('import-file-input').click()">选择 JSON 文件导入</button>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">导入模式：</div>
+        <select class="input" id="import-mode" style="margin-top:4px">
+          <option value="append">追加模式（不覆盖现有数据）</option>
+          <option value="replace">替换模式（清空后导入）</option>
+        </select>
+        <div id="import-status" style="font-size:12px;color:var(--text-muted);margin-top:8px"></div>
+      </div>
+      <div class="section-label section-label-accent" style="margin-top:20px">版本历史</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-ghost" onclick="createSnapshot()">创建快照</button>
+        <button class="btn btn-ghost" onclick="listSnapshots()">查看快照列表</button>
+        <div id="snapshot-list" style="max-height:200px;overflow-y:auto;margin-top:8px"></div>
+      </div>
+    </div>
+    <div id="tab-list" style="display:none"><input class="input" id="list-filter" placeholder="搜索案例 / 概念 / 星云 / 标签…" oninput="renderCaseList()" style="margin-bottom:16px"><div id="case-list"></div></div>
+  </div>
+  <div class="stats-bar"><span id="stats-cases">0 cases</span><span id="stats-tags">0 tags</span><span id="stats-edges">0 links</span></div>
+</div>
+
+<div id="detail-panel" class="panel">
+  <div class="panel-header"><span class="panel-header-title" id="detail-title">案例详情</span><button class="close-btn" onclick="closeDetail()">×</button></div>
+  <div class="panel-body" id="detail-content"></div>
+</div>
+<div id="search-panel" class="panel"><div class="panel-header"><span class="panel-header-title">灵感结果</span><button class="close-btn" onclick="closeSearch()">×</button></div><div class="panel-body" id="search-content"></div></div>
+<div id="hybrid-panel" class="panel"><div class="panel-header"><span class="panel-header-title">嫁接方案</span><button class="close-btn" onclick="closeHybrid()">×</button></div><div class="panel-body" id="hybrid-content"></div></div>
+
+<input type="file" id="hidden-file-input" accept="image/*" style="display:none">
+<input type="file" id="concept-hidden-file-input" accept="image/*" style="display:none">
+
+<script>
+var cases=[],concepts=[],nebulas=[],graphData={nodes:[],edges:[]},simulation,svgG,nodeElements,linkElements,labelElements,ringElements,nebulaRingElements;
+var selectedTags=new Set(),hybridSelected=new Set(),caseDimensions=new Map(),selectedParentTagIds=new Set(),selectedChildTagIds=new Set();
+var tagsData={},selectedCaseTags=new Set(),editingCaseId=null,editingConceptId=null,uploadedImageUrl='',conceptUploadedImageUrl='';
+var activeNebulaId=null;
+
+var ALL_DIMENSIONS=['手法','场地处理','概念','技术','形式','结构'];
+var DIM_DESC={'手法':'空间操作方式','场地处理':'对场地的回应','概念':'核心设计理念','技术':'建造技术与材料','形式':'形式语言与造型','结构':'结构体系与空间'};
+
+function api(path,opts){
+  opts=opts||{};
+  if(opts.body instanceof FormData){
+    return fetch('/api'+path,Object.assign({},opts,{body:opts.body})).then(function(r){if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){throw new Error(e.detail||'HTTP '+r.status);}); return r.json();});
+  }
+  return fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json'}},opts,{body:opts.body?JSON.stringify(opts.body):undefined})).then(function(r){if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){throw new Error(e.detail||'HTTP '+r.status);}); return r.json();});
+}
+
+function initTheme(){
+  var savedTheme=localStorage.getItem('archgraph-theme')||'dark';
+  document.documentElement.setAttribute('data-theme',savedTheme);
+  updateThemeIcon(savedTheme);
+}
+function toggleTheme(){
+  var currentTheme=document.documentElement.getAttribute('data-theme')||'dark';
+  var newTheme=currentTheme==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',newTheme);
+  localStorage.setItem('archgraph-theme',newTheme);
+  updateThemeIcon(newTheme);
+  if(simulation)renderGraph();
+}
+function updateThemeIcon(theme){
+  var sunIcon=document.getElementById('theme-icon-sun');
+  var moonIcon=document.getElementById('theme-icon-moon');
+  if(theme==='light'){
+    if(sunIcon)sunIcon.style.display='';
+    if(moonIcon)moonIcon.style.display='none';
+  }else{
+    if(sunIcon)sunIcon.style.display='none';
+    if(moonIcon)moonIcon.style.display='';
+  }
+}
+async function init(){initTheme();cases=await api('/cases');concepts=await api('/concepts');nebulas=await api('/nebulas');tagsData=await api('/tags');graphData=await api('/graph');renderGraph();renderTagCloud();renderCaseList();updateStats();}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===tab);});
+  ['search','hybrid','add','nebula','tags','data','list'].forEach(function(t){document.getElementById('tab-'+t).style.display=t===tab?'block':'none';});
+  if(tab==='hybrid'){renderHybridTab();highlightHybridNodes();}
+  else if(tab==='tags'){renderTagsTab();}
+  else if(tab==='nebula'){renderNebulaList();}
+  else if(tab==='data'){listSnapshots();}
+  else if(tab==='add'){switchAddMode('case');}
+}
+
+function switchAddMode(mode){
+  var caseForm=document.getElementById('add-case-form');
+  var conceptForm=document.getElementById('add-concept-form');
+  var caseBtn=document.getElementById('add-mode-case');
+  var conceptBtn=document.getElementById('add-mode-concept');
+  if(mode==='case'){
+    caseForm.style.display='block';
+    conceptForm.style.display='none';
+    caseBtn.style.borderBottomColor='var(--accent)';
+    conceptBtn.style.borderBottomColor='transparent';
+    renderTagSelector();
+    uploadedImageUrl='';
+    document.getElementById('img-preview').style.display='none';
+  }else{
+    caseForm.style.display='none';
+    conceptForm.style.display='block';
+    caseBtn.style.borderBottomColor='transparent';
+    conceptBtn.style.borderBottomColor='rgba(139,92,246,.8)';
+    conceptUploadedImageUrl='';
+    document.getElementById('concept-img-preview').style.display='none';
+  }
+}
+
+function renderTagSelector(){
+  var c=document.getElementById('add-tag-selector');
+  var filter=(document.getElementById('add-tag-search')||{}).value.trim().toLowerCase();
+  if(!Object.keys(tagsData).length){c.innerHTML='<div style="color:var(--text-muted);font-size:11px;padding:8px;text-align:center">暂无标签</div>';return;}
+  var entries=Object.entries(tagsData).filter(function(p){var name=(p[1].name||'').toLowerCase();return!filter||name.indexOf(filter)!==-1;});
+  if(!entries.length){c.innerHTML='<div style="color:var(--text-muted);font-size:11px;padding:8px;text-align:center">无匹配标签</div>';return;}
+  var h='';
+  entries.forEach(function(p){var id=p[0],tag=p[1],sel=selectedCaseTags.has(id);
+    h+='<div class="pick-item '+(sel?'selected':'')+'" onclick="toggleCaseTag(\''+id+'\')" style="padding:6px 8px"><div class="check">'+(sel?'✔':'')+'</div><div style="font-size:12px">'+tag.name+'</div></div>';
+  });c.innerHTML=h;
+}
+function toggleCaseTag(id){if(selectedCaseTags.has(id))selectedCaseTags.delete(id);else selectedCaseTags.add(id);renderTagSelector();}
+
+document.getElementById('hidden-file-input').addEventListener('change',function(e){
+  var file=e.target.files[0];
+  if(file){
+    var formData=new FormData();
+    formData.append('file',file);
+    fetch('/api/upload-image',{method:'POST',body:formData}).then(function(r){return r.json();}).then(function(data){
+      uploadedImageUrl=data.url;
+      document.getElementById('img-preview').src=data.url;
+      document.getElementById('img-preview').style.display='block';
+      document.getElementById('add-image').value=data.url;
+    }).catch(function(e){alert('上传失败: '+e.message);});
+  }
+});
+document.getElementById('concept-hidden-file-input').addEventListener('change',function(e){
+  var file=e.target.files[0];
+  if(file){
+    var formData=new FormData();
+    formData.append('file',file);
+    fetch('/api/upload-image',{method:'POST',body:formData}).then(function(r){return r.json();}).then(function(data){
+      conceptUploadedImageUrl=data.url;
+      document.getElementById('concept-img-preview').src=data.url;
+      document.getElementById('concept-img-preview').style.display='block';
+      document.getElementById('concept-image').value=data.url;
+    }).catch(function(e){alert('上传失败: '+e.message);});
+  }
+});
+var conceptUploadArea=document.getElementById('concept-img-upload-area');
+conceptUploadArea.addEventListener('dragover',function(e){e.preventDefault();conceptUploadArea.classList.add('dragging');});
+conceptUploadArea.addEventListener('dragleave',function(e){conceptUploadArea.classList.remove('dragging');});
+conceptUploadArea.addEventListener('drop',function(e){
+  e.preventDefault();
+  conceptUploadArea.classList.remove('dragging');
+  var file=e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')){
+    var formData=new FormData();
+    formData.append('file',file);
+    fetch('/api/upload-image',{method:'POST',body:formData}).then(function(r){return r.json();}).then(function(data){
+      conceptUploadedImageUrl=data.url;
+      document.getElementById('concept-img-preview').src=data.url;
+      document.getElementById('concept-img-preview').style.display='block';
+      document.getElementById('concept-image').value=data.url;
+    }).catch(function(e){alert('上传失败: '+e.message);});
+  }
+});
+
+var uploadArea=document.getElementById('img-upload-area');
+uploadArea.addEventListener('dragover',function(e){e.preventDefault();uploadArea.classList.add('dragging');});
+uploadArea.addEventListener('dragleave',function(e){uploadArea.classList.remove('dragging');});
+uploadArea.addEventListener('drop',function(e){
+  e.preventDefault();
+  uploadArea.classList.remove('dragging');
+  var file=e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')){
+    var formData=new FormData();
+    formData.append('file',file);
+    fetch('/api/upload-image',{method:'POST',body:formData}).then(function(r){return r.json();}).then(function(data){
+      uploadedImageUrl=data.url;
+      document.getElementById('img-preview').src=data.url;
+      document.getElementById('img-preview').style.display='block';
+      document.getElementById('add-image').value=data.url;
+    }).catch(function(e){alert('上传失败: '+e.message);});
+  }
+});
+
+function renderGraph(){
+  var svg=d3.select('#graph-svg');svg.selectAll('*').remove();
+  var W=window.innerWidth,H=window.innerHeight;
+  var defs=svg.append('defs');var glow=defs.append('filter').attr('id','glow').attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+  glow.append('feGaussianBlur').attr('stdDeviation','4').attr('result','blur');glow.append('feComposite').attr('in','SourceGraphic').attr('in2','blur').attr('operator','over');
+  svgG=svg.append('g');var zoom=d3.zoom().scaleExtent([.15,5]).on('zoom',function(e){svgG.attr('transform',e.transform);});
+  svg.call(zoom).call(zoom.transform,d3.zoomIdentity.translate(W/2,H/2).scale(.85));
+  var nodes=graphData.nodes.map(function(d){return Object.assign({},d);}),edges=graphData.edges.map(function(d){return Object.assign({},d);});
+  simulation=d3.forceSimulation(nodes).force('link',d3.forceLink(edges).id(function(d){return d.id;}).distance(90).strength(.25)).force('charge',d3.forceManyBody().strength(function(d){return d.type==='case'?-250:(d.type==='concept'?-200:(d.type==='nebula'?-300:-100));})).force('center',d3.forceCenter(0,0)).force('collision',d3.forceCollide().radius(function(d){return d.type==='case'?28:(d.type==='concept'?24:(d.type==='nebula'?35:16));}));
+  linkElements=svgG.append('g').selectAll('line').data(edges).join('line').attr('stroke',function(d){
+    if(d.type==='nebula_link'){var w=d.weight||1;return'rgba(212,168,83,'+Math.min(.4,.1+w*.05)+')';}
+    if(d.type==='tag_hierarchy')return'rgba(167,139,250,.3)';
+    if(d.type==='case_subtag')return'rgba(167,139,250,.25)';
+    if(d.type==='nebula_case'||d.type==='nebula_concept')return'rgba(212,168,83,.15)';
+    return'rgba(212,168,83,.06)';
+  }).attr('stroke-width',function(d){
+    if(d.type==='nebula_link'){var w=d.weight||1;return Math.min(3,.5+w*.2);}
+    return(d.type==='tag_hierarchy'||d.type==='case_subtag')?1:.5;
+  }).attr('stroke-dasharray',function(d){if(d.type==='tag_hierarchy')return'3,3';if(d.type==='case_subtag')return'5,3';return'none';});
+  ringElements=svgG.append('g').selectAll('circle').data(nodes.filter(function(n){return n.type==='case'||n.type==='concept';})).join('circle').attr('r',function(d){return d.type==='case'?12:10;}).attr('fill','none').attr('stroke',function(d){return d.type==='case'?'rgba(212,168,83,.08)':'rgba(139,92,246,.08)';}).attr('stroke-width',1).style('filter','url(#glow)');
+  var collapsedNebulas=nodes.filter(function(n){return n.type==='nebula'&&n.is_collapsed;});
+  nebulaRingElements=svgG.append('g').selectAll('circle').data(collapsedNebulas.flatMap(function(d){return[{id:d.id+'r1',nebula:d,r:14},{id:d.id+'r2',nebula:d,r:17}];})).join('circle').attr('r',function(d){return d.r;}).attr('fill','none').attr('stroke','rgba(212,168,83,.2)').attr('stroke-width',.6).style('filter','url(#glow)');
+  nodeElements=svgG.append('g').selectAll('circle').data(nodes).join('circle')
+    .attr('r',function(d){
+      if(d.type==='nebula')return d.is_collapsed?6:8;
+      if(d.type==='case')return 6;
+      if(d.type==='concept')return 5.5;
+      if(d.is_bridge)return 5;
+      if(d.is_subtag)return 3;
+      return 3.5;
+    })
+    .attr('fill',function(d){
+      if(d.type==='nebula')return d.is_collapsed?'rgba(212,168,83,.9)':'rgba(212,168,83,.7)';
+      if(d.type==='case')return'var(--accent)';
+      if(d.type==='concept')return'rgba(139,92,246,.6)';
+      if(d.is_bridge)return'rgba(167,139,250,.4)';
+      if(d.is_subtag)return'rgba(167,139,250,.25)';
+      return'rgba(212,168,83,.2)';
+    })
+    .attr('stroke',function(d){
+      if(d.type==='nebula')return d.is_collapsed?'rgba(212,168,83,1)':'rgba(212,168,83,.9)';
+      if(d.type==='case')return'var(--accent)';
+      if(d.type==='concept')return'rgba(139,92,246,.9)';
+      if(d.is_bridge)return'rgba(167,139,250,.8)';
+      if(d.is_subtag)return'rgba(167,139,250,.5)';
+      return'none';
+    })
+    .attr('stroke-width',function(d){if(d.type==='case')return 1.5;if(d.is_bridge||d.is_subtag)return 1;return 0;})
+    .attr('cursor','pointer').on('click',function(e,d){onNodeClick(d);}).on('mouseenter',function(e,d){showTooltip(e,d);highlightConnected(d);}).on('mouseleave',function(){hideTooltip();unhighlightAll();})
+    .call(d3.drag().on('start',function(e,d){if(!e.active)simulation.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',function(e,d){d.fx=e.x;d.fy=e.y;}).on('end',function(e,d){if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;}));
+  labelElements=svgG.append('g').selectAll('text').data(nodes.filter(function(n){return n.type!=='nebula'||!n.is_collapsed;})).join('text').text(function(d){return d.label;})
+    .attr('font-size',function(d){if(d.type==='case')return 11;if(d.type==='concept')return 10;if(d.type==='nebula')return 12;if(d.is_bridge)return 10;if(d.is_subtag)return 8;return 9;})
+    .attr('fill',function(d){
+      var isLight=document.documentElement.getAttribute('data-theme')==='light';
+      if(d.type==='case')return isLight?'rgba(40,40,45,.85)':'rgba(232,228,223,.7)';
+      if(d.type==='concept')return isLight?'rgba(220,38,38,.85)':'rgba(196,181,253,.8)';
+      if(d.type==='nebula')return isLight?'rgba(40,40,45,.9)':'rgba(232,228,223,.9)';
+      if(d.is_bridge)return isLight?'rgba(220,38,38,.75)':'rgba(167,139,250,.8)';
+      if(d.is_subtag)return isLight?'rgba(220,38,38,.6)':'rgba(167,139,250,.5)';
+      return isLight?'rgba(80,80,85,.6)':'rgba(154,149,142,.4)';
+    })
+    .attr('text-anchor','middle').attr('dy',function(d){if(d.type==='case')return-18;if(d.type==='concept')return-15;if(d.type==='nebula')return-20;if(d.is_bridge)return-12;if(d.is_subtag)return-8;return-10;}).attr('font-family','var(--sans)').attr('font-weight',function(d){return(d.is_bridge||d.type==='concept'||d.type==='nebula')?500:300;}).style('pointer-events','none');
+  simulation.on('tick',function(){
+    linkElements.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;}).attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});
+    ringElements.attr('cx',function(d){return d.x;}).attr('cy',function(d){return d.y;});
+    nebulaRingElements.attr('cx',function(d){return d.nebula.x;}).attr('cy',function(d){return d.nebula.y;});
+    nodeElements.attr('cx',function(d){return d.x;}).attr('cy',function(d){return d.y;});
+    labelElements.attr('x',function(d){return d.x;}).attr('y',function(d){return d.y;});
+  });
+}
+
+function showTooltip(ev,d){
+  var tip=document.getElementById('tooltip');
+  var h='<div style="font-family:var(--serif);font-size:14px;margin-bottom:4px">'+d.label+'</div>';
+  if(d.type==='case'){
+    if(d.architect)h+='<div style="color:var(--text-secondary);font-size:11px">'+d.architect+'</div>';
+    if(d.description)h+='<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);line-height:1.7">'+d.description.slice(0,120)+'…</div>';
+    if(d.tags&&d.tags.length)h+='<div style="margin-top:8px">'+d.tags.slice(0,4).map(function(t){return '<span class="tag" style="font-size:10px;padding:1px 6px">'+t+'</span>';}).join('')+'</div>';
+  }else if(d.type==='concept'){
+    h+='<div style="color:rgba(139,92,246,.8);font-size:11px;margin-top:4px">元概念</div>';
+    if(d.keywords&&d.keywords.length)h+='<div style="margin-top:6px">'+d.keywords.slice(0,4).map(function(k){return '<span class="tag" style="font-size:10px;padding:1px 6px;background:rgba(139,92,246,.15);color:rgba(139,92,246,.9)">'+k+'</span>';}).join('')+'</div>';
+    if(d.description)h+='<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);line-height:1.7">'+d.description.slice(0,120)+'…</div>';
+  }else if(d.type==='nebula'){
+    var nebula=nebulas.find(function(x){return x.id===d.id;});
+    if(nebula){
+      var caseCount=nebula.case_ids?nebula.case_ids.length:0;
+      var conceptCount=nebula.concept_ids?nebula.concept_ids.length:0;
+      h+='<div style="color:rgba(212,168,83,.9);font-size:11px;margin-top:4px">星云</div>';
+      h+='<div style="color:var(--text-muted);font-size:11px;margin-top:2px">包含 '+caseCount+' 个案例，'+conceptCount+' 个概念</div>';
+      if(d.is_collapsed)h+='<div style="color:var(--text-muted);font-size:10px;margin-top:2px">（已收起）</div>';
+    }
+  }else{
+    var pdetails=d.parent_details||[];
+    if(d.is_bridge&&pdetails.length>1){
+      h+='<div style="color:var(--purple);font-size:11px;margin-top:4px">桥接标签</div>';
+      h+='<div style="color:var(--text-muted);font-size:11px;margin-top:2px">连接: ';
+      h+=pdetails.map(function(pd){
+        if(pd.type==='case'){var c=cases.find(function(x){return x.id===pd.id;});return c?c.name:pd.id;}
+        return tagsData[pd.id]?tagsData[pd.id].name:pd.id;
+      }).join(' + ');
+      h+='</div>';
+    }
+    var caseIds=new Set();
+    graphData.edges.forEach(function(e){
+      var t=e.target&&(e.target.id||e.target);
+      if(t===d.id&&e.type==='case_tag')caseIds.add(e.source&&(e.source.id||e.source));
+    });
+    (d.parent_details||[]).forEach(function(pd){if(pd.type==='case')caseIds.add(pd.id);});
+    caseIds.delete(undefined);caseIds.delete(null);
+    var cnt=caseIds.size;
+    if(cnt>0){
+      h+='<div style="color:var(--text-muted);font-size:11px;margin-top:2px">'+cnt+' 个关联案例</div>';
+      var names=Array.from(caseIds).map(function(cid){var c=cases.find(function(x){return x.id===cid;});return c?c.name:cid;}).filter(Boolean);
+      if(names.length)h+='<div style="color:var(--text-muted);font-size:10px;margin-top:2px">'+names.join('、')+'</div>';
+    }
+  }
+  tip.innerHTML=h;tip.style.left=(ev.clientX+16)+'px';tip.style.top=(ev.clientY-10)+'px';tip.style.opacity=1;
+}
+function hideTooltip(){document.getElementById('tooltip').style.opacity=0;}
+
+function highlightConnected(d){
+  var conn=new Set([d.id]);
+  graphData.edges.forEach(function(e){
+    var s=e.source.id||e.source,t=e.target.id||e.target;
+    if(s===d.id)conn.add(t);if(t===d.id)conn.add(s);
+  });
+  nodeElements.attr('opacity',function(n){return conn.has(n.id)?1:.12;});
+  labelElements.attr('opacity',function(n){return conn.has(n.id)?1:.06;});
+  linkElements.attr('opacity',function(e){
+    var s=e.source.id||e.source,t=e.target.id||e.target;
+    return(s===d.id||t===d.id)?.6:.02;
+  }).attr('stroke',function(e){
+    var s=e.source.id||e.source,t=e.target.id||e.target;
+    return(s===d.id||t===d.id)?'rgba(212,168,83,.25)':'rgba(212,168,83,.06)';
+  });
+  ringElements.attr('opacity',function(n){return conn.has(n.id)?1:.08;});
+  nebulaRingElements.attr('opacity',function(d){return conn.has(d.nebula.id)?1:.15;});
+}
+function unhighlightAll(){
+  nodeElements.attr('opacity',1);labelElements.attr('opacity',1);
+  linkElements.attr('opacity',1).attr('stroke',function(d){
+    if(d.type==='nebula_link'){var w=d.weight||1;return'rgba(212,168,83,'+Math.min(.4,.1+w*.05)+')';}
+    if(d.type==='tag_hierarchy')return'rgba(167,139,250,.3)';
+    if(d.type==='case_subtag')return'rgba(167,139,250,.25)';
+    if(d.type==='nebula_case'||d.type==='nebula_concept')return'rgba(212,168,83,.15)';
+    return'rgba(212,168,83,.06)';
+  });
+  ringElements.attr('opacity',1);
+  nebulaRingElements.attr('opacity',1);
+}
+
+function onNodeClick(d){
+  var hybridActive=document.querySelector('.tab[data-tab="hybrid"]').classList.contains('active');
+  if(hybridActive&&d.type==='case'){toggleHybridCase(d.id);return;}
+  closeSearch();closeHybrid();
+  if(d.type==='tag'){toggleTag(d.label);return;}
+  if(d.type==='nebula'){
+    if(activeNebulaId===d.id){activeNebulaId=null;}else{activeNebulaId=d.id;}
+    refresh();
+    return;
+  }
+  if(d.type==='concept'){
+    var concept=concepts.find(function(x){return x.id===d.id;});
+    if(!concept)return;
+    editingConceptId=concept.id;
+    var h='';
+    if(concept.image_url)h+='<img src="'+concept.image_url+'" style="width:100%;border-radius:3px;margin-bottom:16px;opacity:.9" onerror="this.style.display=\'none\'">';
+    h+='<h3 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 6px;color:rgba(139,92,246,.9)">'+concept.name+'</h3>';
+    if(concept.keywords&&concept.keywords.length)h+='<div style="margin-top:12px">'+concept.keywords.map(function(k){return '<span class="tag" style="background:rgba(139,92,246,.15);color:rgba(139,92,246,.9)">'+k+'</span>';}).join('')+'</div>';
+    if(concept.description)h+='<div style="margin-top:16px;font-size:13px;line-height:1.8;color:var(--text-secondary)">'+concept.description+'</div>';
+    if(concept.source_url)h+='<a href="'+concept.source_url+'" target="_blank" style="display:inline-block;margin-top:14px;color:rgba(139,92,246,.9);font-size:12px;text-decoration:none;border-bottom:1px solid rgba(139,92,246,.3)">查看来源</a>';
+    h+='<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><button class="btn btn-ghost btn-sm" onclick="editConcept()" style="margin-right:8px">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteConcept(\''+concept.id+'\')">删除</button></div>';
+    document.getElementById('detail-content').innerHTML=h;
+    document.getElementById('detail-title').textContent='元概念详情';
+    document.getElementById('detail-panel').style.display='block';
+    return;
+  }
+  var c=cases.find(function(x){return x.id===d.id;});
+  if(!c)return;
+  editingCaseId=c.id;
+  editingConceptId=null;
+  var h='';
+  if(c.image_url)h+='<img src="'+c.image_url+'" style="width:100%;border-radius:3px;margin-bottom:16px;opacity:.9" onerror="this.style.display=\'none\'">';
+  h+='<h3 style="font-family:var(--serif);font-size:20px;font-weight:400;margin:0 0 6px">'+c.name+'</h3>';
+  if(c.architect)h+='<div style="color:var(--accent);font-size:13px">'+c.architect+'</div>';
+  if(c.year||c.location)h+='<div style="color:var(--text-muted);font-size:12px;margin-top:3px">'+[c.year,c.location].filter(Boolean).join(' · ')+'</div>';
+  if(c.tags&&c.tags.length)h+='<div style="margin-top:12px">'+c.tags.map(function(t){return '<span class="tag" onclick="toggleTag(\''+t+'\')">'+t+'</span>';}).join('')+'</div>';
+  if(c.description)h+='<div style="margin-top:16px;font-size:13px;line-height:1.8;color:var(--text-secondary)">'+c.description+'</div>';
+  if(c.source_url)h+='<a href="'+c.source_url+'" target="_blank" style="display:inline-block;margin-top:14px;color:var(--accent);font-size:12px;text-decoration:none;border-bottom:1px solid rgba(212,168,83,.3)">查看来源</a>';
+  h+='<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><button class="btn btn-ghost btn-sm" onclick="editCase()" style="margin-right:8px">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteCase(\''+c.id+'\')">删除</button></div>';
+  document.getElementById('detail-content').innerHTML=h;
+  document.getElementById('detail-title').textContent='案例详情';
+  document.getElementById('detail-panel').style.display='block';
+}
+function closeDetail(){document.getElementById('detail-panel').style.display='none';editingCaseId=null;editingConceptId=null;editingNebulaId=null;selectedNebulaCases.clear();selectedNebulaConcepts.clear();}
+
+function editCase(){
+  if(!editingCaseId)return;
+  var c=cases.find(function(x){return x.id===editingCaseId;});
+  if(!c)return;
+  document.getElementById('detail-title').textContent='编辑案例';
+  var h='<div class="edit-row"><label>名称</label><input class="input" id="edit-name" value="'+(c.name||'')+'"></div>';
+  h+='<div class="edit-row"><label>建筑师</label><input class="input" id="edit-architect" value="'+(c.architect||'')+'"></div>';
+  h+='<div class="edit-row"><label>年份</label><input class="input" id="edit-year" value="'+(c.year||'')+'"></div>';
+  h+='<div class="edit-row"><label>地点</label><input class="input" id="edit-location" value="'+(c.location||'')+'"></div>';
+  h+='<div class="edit-row"><label>标签</label><input class="input" id="edit-tags" value="'+(c.tags?c.tags.join(', '):'')+'"></div>';
+  h+='<div class="edit-row"><label>描述</label><textarea class="input" id="edit-desc">'+(c.description||'')+'</textarea></div>';
+  h+='<div class="edit-row"><label>图片</label><input class="input" id="edit-image" value="'+(c.image_url||'')+'"></div>';
+  h+='<div class="edit-row"><label>来源</label><input class="input" id="edit-source" value="'+(c.source_url||'')+'"></div>';
+  h+='<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveCaseEdit()">保存</button><button class="btn btn-ghost" onclick="onNodeClick({id:\''+editingCaseId+'\'})" style="margin-left:8px">取消</button></div>';
+  document.getElementById('detail-content').innerHTML=h;
+}
+
+async function saveCaseEdit(){
+  if(!editingCaseId)return;
+  var update={};
+  var name=document.getElementById('edit-name').value.trim();
+  if(name)update.name=name;
+  var architect=document.getElementById('edit-architect').value.trim();
+  if(architect)update.architect=architect;
+  var year=document.getElementById('edit-year').value.trim();
+  if(year)update.year=year;
+  var location=document.getElementById('edit-location').value.trim();
+  if(location)update.location=location;
+  var tags=document.getElementById('edit-tags').value.split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean);
+  if(tags.length)update.tags=tags;
+  var desc=document.getElementById('edit-desc').value.trim();
+  if(desc)update.description=desc;
+  var img=document.getElementById('edit-image').value.trim();
+  if(img)update.image_url=img;
+  var src=document.getElementById('edit-source').value.trim();
+  if(src)update.source_url=src;
+  try{
+    await api('/cases/'+editingCaseId,{method:'PUT',body:update});
+    await refresh();
+    var c=cases.find(function(x){return x.id===editingCaseId;});
+    if(c)onNodeClick({id:editingCaseId});
+  }catch(e){alert('保存失败: '+e.message);}
+}
+
+function renderTagCloud(){
+  var tc={};
+  cases.forEach(function(c){(c.tags||[]).forEach(function(t){tc[t]=(tc[t]||0)+1;});});
+  var sorted=Object.entries(tc).sort(function(a,b){return b[1]-a[1];});
+  document.getElementById('tag-cloud').innerHTML=sorted.map(function(p){
+    var t=p[0],n=p[1];
+    return '<span class="tag '+(selectedTags.has(t)?'active':'')+'" onclick="toggleTag(\''+t+'\')">'+t+' <span style="opacity:.4">'+n+'</span></span>';
+  }).join('');
+  document.getElementById('active-tags').innerHTML=selectedTags.size>0?'<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase">已选标签</div>'+Array.from(selectedTags).map(function(t){return '<span class="tag active" onclick="toggleTag(\''+t+'\')">'+t+' ✕</span>';}).join(''):'';
+}
+function toggleTag(t){if(selectedTags.has(t))selectedTags.delete(t);else selectedTags.add(t);renderTagCloud();highlightByTags();}
+function highlightByTags(){
+  if(selectedTags.size===0){unhighlightAll();return;}
+  var matched=new Set();
+  cases.forEach(function(c){if(Array.from(selectedTags).some(function(t){return(c.tags||[]).includes(t);}))matched.add(c.id);});
+  var matchedTags=new Set(Array.from(selectedTags).map(function(t){return 'tag_'+t;}));
+  nodeElements.attr('opacity',function(d){return matched.has(d.id)||matchedTags.has(d.id)?1:.08;});
+  linkElements.attr('opacity',function(d){
+    var s=d.source.id||d.source,t=d.target.id||d.target;
+    return(matched.has(s)&&matchedTags.has(t))||(matched.has(t)&&matchedTags.has(s))?.5:.02;
+  });
+  labelElements.attr('opacity',function(d){return matched.has(d.id)||matchedTags.has(d.id)?1:.05;});
+  ringElements.attr('opacity',function(d){return matched.has(d.id)?1:.05;});
+}
+
+function renderCaseList(){
+  var f=(document.getElementById('list-filter')?.value||'').toLowerCase();
+  var html='';
+  var filteredCases=cases.filter(function(c){
+    return c.name.toLowerCase().includes(f)||(c.tags||[]).some(function(t){return t.toLowerCase().includes(f);})||(c.architect||'').toLowerCase().includes(f);
+  });
+  var filteredConcepts=concepts.filter(function(c){
+    return c.name.toLowerCase().includes(f)||(c.keywords||[]).some(function(k){return k.toLowerCase().includes(f);})||(c.description||'').toLowerCase().includes(f);
+  });
+  var filteredNebulas=nebulas.filter(function(n){
+    return n.name.toLowerCase().includes(f);
+  });
+  if(filteredCases.length>0){
+    html+='<div class="section-label" style="margin-bottom:8px">案例</div>';
+    html+=filteredCases.map(function(c){
+      return '<div class="case-item" onclick=\'onNodeClick({type:"case",id:"'+c.id+'"})\'><div class="case-name">'+c.name+'</div><div class="case-meta">'+(c.architect||'')+(c.year?' · '+c.year:'')+'</div><div style="margin-top:6px">'+(c.tags||[]).slice(0,4).map(function(t){return '<span class="tag" style="font-size:10px;padding:1px 6px">'+t+'</span>';}).join('')+'</div></div>';
+    }).join('');
+  }
+  if(filteredConcepts.length>0){
+    html+='<div class="section-label" style="margin-top:16px;margin-bottom:8px">元概念</div>';
+    html+=filteredConcepts.map(function(c){
+      return '<div class="case-item" onclick=\'onNodeClick({type:"concept",id:"'+c.id+'"})\' style="border-left-color:rgba(139,92,246,.5)"><div class="case-name" style="color:rgba(139,92,246,.9)">'+c.name+'</div><div style="margin-top:6px">'+(c.keywords||[]).slice(0,4).map(function(k){return '<span class="tag" style="font-size:10px;padding:1px 6px;background:rgba(139,92,246,.15);color:rgba(139,92,246,.9)">'+k+'</span>';}).join('')+'</div></div>';
+    }).join('');
+  }
+  if(filteredNebulas.length>0){
+    html+='<div class="section-label" style="margin-top:16px;margin-bottom:8px">星云</div>';
+    html+=filteredNebulas.map(function(n){
+      var caseCount=n.case_ids?n.case_ids.length:0;
+      var conceptCount=n.concept_ids?n.concept_ids.length:0;
+      var isActive=activeNebulaId===n.id;
+      return '<div class="case-item" onclick=\'switchNebula("'+n.id+'")\' style="border-left-color:'+(isActive?'var(--accent)':'rgba(212,168,83,.5)')+'"><div class="case-name" style="color:'+(isActive?'var(--accent)':'rgba(212,168,83,.9)')+'">'+n.name+'</div><div class="case-meta">'+caseCount+' 个案例，'+conceptCount+' 个概念'+(isActive?'（当前激活）':'')+'</div></div>';
+    }).join('');
+  }
+  document.getElementById('case-list').innerHTML=html||'<div style="color:var(--text-muted);padding:24px;text-align:center">无匹配结果</div>';
+}
+
+async function addCase(){
+  var name=document.getElementById('add-name').value.trim();
+  if(!name)return alert('请输入项目名称');
+  var selectedTagNames=Array.from(selectedCaseTags).map(function(id){return tagsData[id]?.name;}).filter(Boolean);
+  var manualTags=document.getElementById('add-tags').value.split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean);
+  var allTags=Array.from(new Set(selectedTagNames.concat(manualTags)));
+  var body={name:name,architect:document.getElementById('add-architect').value.trim(),year:document.getElementById('add-year').value.trim(),location:document.getElementById('add-location').value.trim(),tags:allTags,description:document.getElementById('add-desc').value.trim(),image_url:uploadedImageUrl||document.getElementById('add-image').value.trim(),source_url:document.getElementById('add-source').value.trim()};
+  try{
+    await api('/cases',{method:'POST',body:body});
+    ['add-name','add-architect','add-year','add-location','add-tags','add-desc','add-image','add-source'].forEach(function(id){document.getElementById(id).value='';});
+    selectedCaseTags.clear();
+    uploadedImageUrl='';
+    document.getElementById('img-preview').style.display='none';
+    renderTagSelector();
+    await refresh();
+    switchTab('list');
+  }catch(e){alert('添加失败: '+e.message);}
+}
+
+async function importURL(){
+  var url=document.getElementById('import-url').value.trim();
+  if(!url)return alert('请粘贴链接');
+  document.getElementById('import-loading').style.display='block';
+  try{
+    var r=await api('/import-url',{method:'POST',body:{url:url,extra_notes:document.getElementById('import-notes').value.trim()}});
+    document.getElementById('import-url').value='';
+    document.getElementById('import-notes').value='';
+    await refresh();
+    onNodeClick({type:'case',id:r.id});
+    switchTab('list');
+  }catch(e){alert('导入失败: '+e.message);}
+  finally{document.getElementById('import-loading').style.display='none';}
+}
+
+async function importConceptURL(){
+  var url=document.getElementById('concept-import-url').value.trim();
+  if(!url)return alert('请粘贴链接');
+  document.getElementById('concept-import-loading').style.display='block';
+  try{
+    var r=await api('/concepts/from-url',{method:'POST',body:{url:url,extra_notes:document.getElementById('concept-import-notes').value.trim()}});
+    document.getElementById('concept-import-url').value='';
+    document.getElementById('concept-import-notes').value='';
+    await refresh();
+    onNodeClick({type:'concept',id:r.id});
+    switchTab('list');
+  }catch(e){alert('导入失败: '+e.message);}
+  finally{document.getElementById('concept-import-loading').style.display='none';}
+}
+
+async function addConcept(){
+  var name=document.getElementById('concept-name').value.trim();
+  if(!name)return alert('请输入概念名称');
+  var keywords=document.getElementById('concept-keywords').value.split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean);
+  var body={name:name,keywords:keywords,description:document.getElementById('concept-desc').value.trim(),image_url:conceptUploadedImageUrl||document.getElementById('concept-image').value.trim(),source_url:document.getElementById('concept-source').value.trim()};
+  try{
+    await api('/concepts',{method:'POST',body:body});
+    ['concept-name','concept-keywords','concept-desc','concept-image','concept-source'].forEach(function(id){document.getElementById(id).value='';});
+    conceptUploadedImageUrl='';
+    document.getElementById('concept-img-preview').style.display='none';
+    await refresh();
+    switchTab('list');
+  }catch(e){alert('添加失败: '+e.message);}
+}
+
+async function deleteCase(id){
+  if(!confirm('确定删除？'))return;
+  try{
+    await api('/cases/'+id,{method:'DELETE'});
+    closeDetail();
+    await refresh();
+  }catch(e){alert('删除失败: '+e.message);}
+}
+
+function editConcept(){
+  if(!editingConceptId)return;
+  var concept=concepts.find(function(x){return x.id===editingConceptId;});
+  if(!concept)return;
+  document.getElementById('detail-title').textContent='编辑元概念';
+  var h='<div class="edit-row"><label>名称</label><input class="input" id="edit-concept-name" value="'+(concept.name||'')+'"></div>';
+  h+='<div class="edit-row"><label>关键词</label><input class="input" id="edit-concept-keywords" value="'+(concept.keywords?concept.keywords.join(', '):'')+'"></div>';
+  h+='<div class="edit-row"><label>描述</label><textarea class="input" id="edit-concept-desc">'+(concept.description||'')+'</textarea></div>';
+  h+='<div class="edit-row"><label>图片</label><input class="input" id="edit-concept-image" value="'+(concept.image_url||'')+'"></div>';
+  h+='<div class="edit-row"><label>来源</label><input class="input" id="edit-concept-source" value="'+(concept.source_url||'')+'"></div>';
+  h+='<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveConceptEdit()">保存</button><button class="btn btn-ghost" onclick="onNodeClick({type:\'concept\',id:\''+editingConceptId+'\'})" style="margin-left:8px">取消</button></div>';
+  document.getElementById('detail-content').innerHTML=h;
+}
+
+async function saveConceptEdit(){
+  if(!editingConceptId)return;
+  var update={};
+  var name=document.getElementById('edit-concept-name').value.trim();
+  if(name)update.name=name;
+  var keywords=document.getElementById('edit-concept-keywords').value.split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean);
+  if(keywords.length)update.keywords=keywords;
+  var desc=document.getElementById('edit-concept-desc').value.trim();
+  if(desc)update.description=desc;
+  var img=document.getElementById('edit-concept-image').value.trim();
+  if(img)update.image_url=img;
+  var src=document.getElementById('edit-concept-source').value.trim();
+  if(src)update.source_url=src;
+  try{
+    await api('/concepts/'+editingConceptId,{method:'PUT',body:update});
+    await refresh();
+    var concept=concepts.find(function(x){return x.id===editingConceptId;});
+    if(concept)onNodeClick({type:'concept',id:editingConceptId});
+  }catch(e){alert('保存失败: '+e.message);}
+}
+
+async function deleteConcept(id){
+  if(!confirm('确定删除？'))return;
+  try{
+    await api('/concepts/'+id,{method:'DELETE'});
+    closeDetail();
+    await refresh();
+  }catch(e){alert('删除失败: '+e.message);}
+}
+
+async function doSearch(){
+  var q=document.getElementById('search-input').value.trim();
+  if(!q)return alert('请描述你的设计需求');
+  closeDetail();closeHybrid();
+  document.getElementById('search-loading').style.display='block';
+  document.getElementById('search-panel').style.display='none';
+  try{
+    var r=await api('/search',{method:'POST',body:{query:q,selected_tags:Array.from(selectedTags)}});
+    renderSearchResults(r);
+  }catch(e){alert('搜索失败: '+e.message);}
+  finally{document.getElementById('search-loading').style.display='none';}
+}
+
+function renderSearchResults(r){
+  var h='';
+  if(r.matched_cases&&r.matched_cases.length){
+    h+='<div class="section-label section-label-accent" style="margin-bottom:10px">知识图谱中的关联</div>';
+    r.matched_cases.forEach(function(m){h+='<div class="result-card"><div style="font-weight:500;font-size:14px">'+m.name+'</div><div style="color:var(--text-secondary);font-size:12px;margin-top:6px;line-height:1.7">'+m.reason+'</div></div>';});
+  }
+  if(r.new_suggestions&&r.new_suggestions.length){
+    h+='<div class="section-label section-label-green" style="margin:18px 0 10px">推荐新案例（来自联网搜索）</div>';
+    r.new_suggestions.forEach(function(s){
+      var safeS=JSON.stringify(s).replace(/'/g,"&#39;");
+      h+='<div class="result-card" style="cursor:pointer" onclick=\'addSuggestion('+safeS+')\'><div style="display:flex;justify-content:space-between;align-items:start"><div><div style="font-weight:500;font-size:14px">'+s.name+'</div><div style="color:var(--text-muted);font-size:11px">'+(s.architect||'')+(s.year?' · '+s.year:'')+'</div></div><span class="btn btn-success" style="font-size:10px;padding:4px 10px;flex-shrink:0">+ 添加</span></div>';
+      if(s.tags&&s.tags.length)h+='<div style="margin-top:6px">'+s.tags.map(function(t){return '<span class="tag" style="font-size:10px;padding:1px 6px">'+t+'</span>';}).join('')+'</div>';
+      h+='<div style="color:var(--text-secondary);font-size:12px;margin-top:8px;line-height:1.7">'+(s.description||'')+'</div>';
+      if(s.source_url){var url=(s.source_url+'').replace(/"/g,'&quot;');h+='<a href="'+url+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:11px;color:var(--accent);margin-top:6px;display:inline-block">查看来源</a>';}
+      h+='</div>';
+    });
+  }
+  if(r.design_insights&&r.design_insights.length){
+    h+='<div class="section-label" style="margin:18px 0 10px;color:#fbbf24">设计策略</div>';
+    r.design_insights.forEach(function(ins,i){h+='<div style="padding:10px 0;font-size:13px;color:var(--text-secondary);line-height:1.8;border-bottom:1px solid var(--border)"><span style="color:var(--accent);font-weight:600">'+(i+1)+'.</span> '+ins+'</div>';});
+  }
+  if(r.extended_tags&&r.extended_tags.length){
+    h+='<div class="section-label" style="margin:18px 0 10px">可继续探索</div><div>'+r.extended_tags.map(function(t){return '<span class="tag">'+t+'</span>';}).join('')+'</div>';
+  }
+  document.getElementById('search-content').innerHTML=h;
+  document.getElementById('search-panel').style.display='block';
+}
+
+async function addSuggestion(s){
+  try{
+    await api('/cases/from-suggestion',{method:'POST',body:{name:s.name,architect:s.architect||'',year:s.year||'',location:s.location||'',tags:s.tags||[],description:s.description||'',image_url:'',source_url:s.source_url||''}});
+    await refresh();
+    alert('"'+s.name+'" 已添加');
+  }catch(e){alert(e.message);}
+}
+function closeSearch(){document.getElementById('search-panel').style.display='none';}
+
+function renderHybridTab(){
+  renderHybridSelected();renderHybridPickList();renderCaseDimensions();updateHybridBtn();
+}
+function renderHybridSelected(){
+  var el=document.getElementById('hybrid-selected');
+  el.innerHTML=hybridSelected.size===0?'<div style="color:var(--text-muted);font-size:12px;padding:4px 0">在下方列表或图谱上点击选择</div>':Array.from(hybridSelected).map(function(id){
+    var c=cases.find(function(x){return x.id===id;});
+    return c?'<span class="case-chip">'+c.name+'<span class="remove" onclick="toggleHybridCase(\''+id+'\')">✕</span></span>':'';
+  }).join('');
+  document.getElementById('hybrid-count').textContent='（'+hybridSelected.size+'/4）';
+}
+function renderHybridPickList(){
+  document.getElementById('hybrid-pick-list').innerHTML=cases.map(function(c){
+    var sel=hybridSelected.has(c.id);
+    return '<div class="pick-item '+(sel?'selected':'')+'" onclick="toggleHybridCase(\''+c.id+'\')"><div class="check">'+(sel?'✓':'')+'</div><div><div style="font-weight:500">'+c.name+'</div><div style="color:var(--text-muted);font-size:11px">'+(c.architect||'')+'</div></div></div>';
+  }).join('');
+}
+function toggleHybridCase(id){
+  if(hybridSelected.has(id)){
+    hybridSelected.delete(id);
+    caseDimensions.delete(id);
+  }else{
+    if(hybridSelected.size>=4)return alert('最多选择4个案例');
+    hybridSelected.add(id);
+    if(!caseDimensions.has(id))caseDimensions.set(id,[]);
+  }
+  renderHybridTab();highlightHybridNodes();
+}
+function renderCaseDimensions(){
+  var container=document.getElementById('case-dimensions');
+  if(hybridSelected.size===0){
+    container.innerHTML='<div style="color:var(--text-muted);font-size:11px;padding:12px;text-align:center">请先选择案例</div>';
+    return;
+  }
+  var html='';
+  Array.from(hybridSelected).forEach(function(caseId){
+    var c=cases.find(function(x){return x.id===caseId;});
+    if(!c)return;
+    var dims=caseDimensions.get(caseId)||[];
+    html+='<div style="padding:12px;border:1px solid var(--border);border-radius:3px;margin-bottom:10px;background:rgba(255,255,255,.02)">';
+    html+='<div style="font-weight:500;font-size:13px;margin-bottom:8px;color:var(--purple)">'+c.name+'</div>';
+    html+='<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase">预设维度</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    ALL_DIMENSIONS.forEach(function(d){
+      var isSelected=dims.includes(d);
+      html+='<div class="dim-btn '+(isSelected?'active':'')+'" onclick="toggleCaseDimension(\''+caseId+'\',\''+d+'\')" title="'+DIM_DESC[d]+'">'+d+'</div>';
+    });
+    html+='</div></div>';
+    html+='<div><div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase">自定义维度</div>';
+    html+='<input class="input" id="custom-dim-'+caseId+'" placeholder="输入自定义维度（如：材料表达、空间序列等）" style="font-size:11px;padding:8px" onkeydown="if(event.key===\'Enter\'){addCustomDimension(\''+caseId+'\')}">';
+    html+='<button class="btn btn-ghost btn-sm" onclick="addCustomDimension(\''+caseId+'\')" style="margin-top:6px;width:100%">添加</button>';
+    if(dims.length>0){
+      html+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">';
+      html+='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">已选维度</div>';
+      dims.forEach(function(d){
+        html+='<span class="tag active" onclick="removeCaseDimension(\''+caseId+'\',\''+d+'\')" style="margin:2px">'+d+' ✕</span>';
+      });
+      html+='</div>';
+    }
+    html+='</div></div>';
+  });
+  container.innerHTML=html;
+}
+function toggleCaseDimension(caseId,dim){
+  var dims=caseDimensions.get(caseId)||[];
+  var idx=dims.indexOf(dim);
+  if(idx>=0)dims.splice(idx,1);
+  else dims.push(dim);
+  caseDimensions.set(caseId,dims);
+  renderCaseDimensions();
+  updateHybridBtn();
+}
+function addCustomDimension(caseId){
+  var input=document.getElementById('custom-dim-'+caseId);
+  var dim=input.value.trim();
+  if(!dim)return;
+  var dims=caseDimensions.get(caseId)||[];
+  if(dims.includes(dim))return alert('该维度已添加');
+  dims.push(dim);
+  caseDimensions.set(caseId,dims);
+  input.value='';
+  renderCaseDimensions();
+  updateHybridBtn();
+}
+function removeCaseDimension(caseId,dim){
+  var dims=caseDimensions.get(caseId)||[];
+  var idx=dims.indexOf(dim);
+  if(idx>=0){
+    dims.splice(idx,1);
+    caseDimensions.set(caseId,dims);
+    renderCaseDimensions();
+    updateHybridBtn();
+  }
+}
+function updateHybridBtn(){
+  var btn=document.getElementById('hybrid-btn');
+  var allHaveDims=true;
+  Array.from(hybridSelected).forEach(function(caseId){
+    var dims=caseDimensions.get(caseId)||[];
+    if(dims.length===0)allHaveDims=false;
+  });
+  var ok=hybridSelected.size>=2&&allHaveDims;
+  btn.disabled=!ok;btn.style.opacity=ok?1:.3;
+}
+function highlightHybridNodes(){
+  if(!nodeElements)return;
+  if(hybridSelected.size===0){
+    nodeElements.attr('stroke',function(d){return d.type==='case'?'var(--accent)':'none';}).attr('stroke-width',function(d){return d.type==='case'?1.5:0;}).attr('r',function(d){return d.type==='case'?6:3.5;});
+    ringElements.attr('stroke','rgba(212,168,83,.08)').attr('r',12);return;
+  }
+  nodeElements.attr('stroke',function(d){return hybridSelected.has(d.id)?'var(--purple)':(d.type==='case'?'var(--accent)':'none');}).attr('stroke-width',function(d){return hybridSelected.has(d.id)?2.5:(d.type==='case'?1.5:0);}).attr('r',function(d){return hybridSelected.has(d.id)?9:(d.type==='case'?6:3.5);});
+  ringElements.attr('stroke',function(d){return hybridSelected.has(d.id)?'rgba(167,139,250,.2)':'rgba(212,168,83,.08)';}).attr('r',function(d){return hybridSelected.has(d.id)?16:12;});
+}
+async function doHybridize(){
+  if(hybridSelected.size<2)return alert('请至少选择2个案例');
+  var allDims=[];
+  Array.from(hybridSelected).forEach(function(caseId){
+    var dims=caseDimensions.get(caseId)||[];
+    if(dims.length===0)return alert('请为每个案例至少选择一个杂交维度');
+    allDims=allDims.concat(dims);
+  });
+  var uniqueDims=Array.from(new Set(allDims));
+  closeDetail();closeSearch();
+  document.getElementById('hybrid-loading').style.display='block';
+  document.getElementById('hybrid-loading').innerHTML='<div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted);font-size:12px">重组设计 DNA…</div>';
+  document.getElementById('hybrid-panel').style.display='none';
+  try{
+    var caseDimMap={};
+    Array.from(hybridSelected).forEach(function(caseId){
+      caseDimMap[caseId]=caseDimensions.get(caseId)||[];
+    });
+    var r=await api('/hybridize',{method:'POST',body:{case_ids:Array.from(hybridSelected),dimensions:uniqueDims,case_dimensions:caseDimMap}});
+    if(r.image_prompt&&!r.image_url){
+      document.getElementById('hybrid-loading').innerHTML='<div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted);font-size:12px">正在生成效果图…</div>';
+    }
+    renderHybridResults(r);
+  }catch(e){alert('嫁接失败: '+e.message);}
+  finally{document.getElementById('hybrid-loading').style.display='none';document.getElementById('hybrid-loading').innerHTML='<div class="spinner"></div><div style="margin-top:10px;color:var(--text-muted);font-size:12px">重组设计 DNA…</div>';}
+}
+function renderHybridResults(r){
+  var h='';
+  if(r.extraction&&r.extraction.length){
+    h+='<div class="section-label section-label-purple" style="margin-bottom:10px">设计 DNA 提取</div>';
+    r.extraction.forEach(function(e){
+      h+='<div class="extract-card"><div style="font-family:var(--serif);font-size:14px;margin-bottom:8px">'+e.case_name+'</div>';
+      if(e.dimensions)Object.entries(e.dimensions).forEach(function(p){
+        var d=p[0],v=p[1];
+        h+='<div style="margin-bottom:4px"><span class="dim-label">'+d+'</span><span style="font-size:12px;color:var(--text-secondary)">'+v+'</span></div>';
+      });
+      h+='</div>';
+    });
+  }
+  var hc=r.hybrid_concept;
+  if(hc){
+    h+='<div style="margin-top:18px;padding:20px;border-radius:3px;background:linear-gradient(160deg,rgba(167,139,250,.06),rgba(212,168,83,.06));border:1px solid rgba(167,139,250,.12)">';
+    h+='<div style="font-size:10px;color:var(--purple);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">嫁接方案</div>';
+    h+='<div style="font-family:var(--serif);font-size:22px;font-weight:400;color:var(--text-primary);margin-bottom:14px;line-height:1.4">'+(hc.title||'')+'</div>';
+    if(r.image_url){
+      h+='<div style="margin-bottom:16px;position:relative"><img src="'+r.image_url+'" style="width:100%;border-radius:3px;opacity:.9;display:block" onerror="this.style.display=\'none\'"><div style="font-size:9px;color:var(--text-muted);margin-top:4px;text-align:center">AI 生成效果图</div></div>';
+    }else if(r.image_error){
+      h+='<div style="padding:12px;background:rgba(220,80,70,.1);border:1px solid rgba(220,80,70,.2);border-radius:3px;margin-bottom:16px;font-size:11px;color:#e06560">效果图生成失败: '+r.image_error+'</div>';
+    }
+    if(hc.narrative)h+='<div style="font-size:13px;color:var(--text-secondary);line-height:1.9;margin-bottom:16px">'+hc.narrative+'</div>';
+    if(hc.how_it_works)h+='<div style="margin-bottom:14px"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">组合逻辑</div><div style="font-size:12px;color:var(--text-secondary);line-height:1.8">'+hc.how_it_works+'</div></div>';
+    if(hc.possible_scenario)h+='<div style="margin-bottom:14px"><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);margin-bottom:6px">落地场景</div><div style="font-size:12px;color:var(--text-secondary);line-height:1.8">'+hc.possible_scenario+'</div></div>';
+    if(hc.tension_and_potential)h+='<div><div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#fbbf24;margin-bottom:6px">张力与潜力</div><div style="font-size:12px;color:var(--text-secondary);line-height:1.8">'+hc.tension_and_potential+'</div></div>';
+    h+='</div>';
+  }
+  document.getElementById('hybrid-content').innerHTML=h;
+  document.getElementById('hybrid-panel').style.display='block';
+}
+function closeHybrid(){document.getElementById('hybrid-panel').style.display='none';}
+
+async function syncTagsFromCases(){
+  try{
+    await api('/tags/sync-from-cases',{method:'POST'});
+    await refresh();
+    if(document.querySelector('.tab[data-tab="tags"]')?.classList.contains('active')) renderTagsTab();
+  }catch(e){alert('同步失败: '+e.message);}
+}
+
+function renderTagsTab(){
+  renderTagParentMultiSelect();
+  renderChildTagMultiSelect();
+}
+function filterChildTagList(){var f=(document.getElementById('tag-child-search')||{}).value||'';renderChildTagMultiSelect(f);}
+function renderChildTagMultiSelect(filter){
+  filter=(filter||'').trim().toLowerCase();
+  var container=document.getElementById('tag-child-multi');
+  if(!container)return;
+  var entries=Object.entries(tagsData).filter(function(p){var n=(p[1].name||'').toLowerCase();return!filter||n.indexOf(filter)!==-1;});
+  var html=entries.length?entries.map(function(p){
+    var id=p[0],tag=p[1],sel=selectedChildTagIds.has(id);
+    return '<div class="pick-item '+(sel?'selected':'')+'" onclick="toggleChildTag(\''+id+'\')" style="padding:5px 8px"><div class="check" style="width:14px;height:14px;font-size:9px">'+(sel?'✔':'')+'</div><div style="font-size:12px">'+tag.name+'</div></div>';
+  }).join(''):'<div style="color:var(--text-muted);font-size:11px;padding:12px;text-align:center">暂无标签</div>';
+  container.innerHTML=html;
+  renderChildTagSelected();
+}
+function toggleChildTag(id){if(selectedChildTagIds.has(id))selectedChildTagIds.delete(id);else selectedChildTagIds.add(id);renderChildTagMultiSelect((document.getElementById('tag-child-search')||{}).value||'');}
+function renderChildTagSelected(){
+  var el=document.getElementById('tag-child-selected');
+  if(!el)return;
+  if(selectedChildTagIds.size===0){el.innerHTML='';return;}
+  el.innerHTML='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">已选子标签</div>'+Array.from(selectedChildTagIds).map(function(tid){
+    var name=tagsData[tid]?tagsData[tid].name:tid;
+    return '<span class="tag active" onclick="toggleChildTag(\''+tid+'\')">'+name+' ✕</span>';
+  }).join('');
+}
+function renderTagParentMultiSelect(filter){
+  filter=filter||'';
+  var container=document.getElementById('tag-parent-multi');
+  var caseTagMap={},caseList=[];
+  cases.forEach(function(c){
+    var caseKey=c.id;
+    var caseMatchesFilter=!filter||c.name.toLowerCase().indexOf(filter.toLowerCase())!==-1||(c.architect&&c.architect.toLowerCase().indexOf(filter.toLowerCase())!==-1);
+    if(caseMatchesFilter){caseList.push({caseId:c.id,caseName:c.name,architect:c.architect||'',key:caseKey});}
+    if(!caseTagMap[c.name])caseTagMap[c.name]={caseId:c.id,tags:[]};
+    (c.tags||[]).forEach(function(t){
+      var key=c.id+'::'+t;
+      if(filter&&t.toLowerCase().indexOf(filter.toLowerCase())===-1&&c.name.toLowerCase().indexOf(filter.toLowerCase())===-1)return;
+      caseTagMap[c.name].tags.push({tagName:t,key:key});
+    });
+  });
+  var customTags=Object.entries(tagsData).filter(function(p){var tag=p[1];var pids=tag.parent_ids||[];return pids.length===0&&!tag.parent_id;});
+  var html='';
+  if(caseList.length>0){
+    html+='<div style="font-size:10px;color:var(--accent);padding:6px 8px 2px;letter-spacing:.5px">案例（作为父节点）</div>';
+    caseList.forEach(function(caseItem){
+      var isSelected=selectedParentTagIds.has(caseItem.key);
+      html+='<div class="pick-item '+(isSelected?'selected':'')+'" onclick="toggleParentTag(\''+caseItem.key+'\')" style="padding:5px 8px"><div class="check" style="width:14px;height:14px;font-size:9px">'+(isSelected?'✔':'')+'</div><div style="font-size:12px;color:var(--accent);font-weight:500">'+caseItem.caseName+(caseItem.architect?' ('+caseItem.architect+')':'')+'</div></div>';
+    });
+  }
+  Object.entries(caseTagMap).forEach(function(p){
+    var caseName=p[0],caseData=p[1];
+    if(caseData.tags.length===0)return;
+    var caseMatchesFilter=!filter||caseName.toLowerCase().indexOf(filter.toLowerCase())!==-1;
+    var hasMatchingTags=caseData.tags.some(function(t){return!filter||t.tagName.toLowerCase().indexOf(filter.toLowerCase())!==-1;});
+    if(!caseMatchesFilter&&!hasMatchingTags)return;
+    html+='<div style="font-size:10px;color:var(--text-muted);padding:6px 8px 2px;letter-spacing:.5px;margin-top:8px">'+caseName+' 的子标签</div>';
+    caseData.tags.forEach(function(item){
+      if(filter&&item.tagName.toLowerCase().indexOf(filter.toLowerCase())===-1&&caseName.toLowerCase().indexOf(filter.toLowerCase())===-1)return;
+      var isSelected=selectedParentTagIds.has(item.key);
+      html+='<div class="pick-item '+(isSelected?'selected':'')+'" onclick="toggleParentTag(\''+item.key+'\')" style="padding:5px 8px;padding-left:20px"><div class="check" style="width:14px;height:14px;font-size:9px">'+(isSelected?'✔':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+item.tagName+'</div></div>';
+    });
+  });
+  if(customTags.length>0){
+    var filtered=customTags.filter(function(p){return!filter||p[1].name.toLowerCase().indexOf(filter.toLowerCase())!==-1;});
+    if(filtered.length>0){
+      html+='<div style="font-size:10px;color:var(--purple);padding:6px 8px 2px;letter-spacing:.5px;margin-top:8px">自定义标签</div>';
+      filtered.forEach(function(p){
+        var key='tag::'+p[0];
+        var isSelected=selectedParentTagIds.has(key);
+        html+='<div class="pick-item '+(isSelected?'selected':'')+'" onclick="toggleParentTag(\''+key+'\')" style="padding:5px 8px"><div class="check" style="width:14px;height:14px;font-size:9px">'+(isSelected?'✔':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+p[1].name+'</div></div>';
+      });
+    }
+  }
+  container.innerHTML=html||'<div style="color:var(--text-muted);font-size:11px;padding:12px;text-align:center">暂无可选标签</div>';
+  renderTagParentSelected();
+}
+function filterTagParentList(){var filter=document.getElementById('tag-parent-search')?.value||'';renderTagParentMultiSelect(filter);}
+function toggleParentTag(key){
+  if(selectedParentTagIds.has(key))selectedParentTagIds.delete(key);else selectedParentTagIds.add(key);
+  renderTagParentMultiSelect(document.getElementById('tag-parent-search')?.value||'');
+}
+function renderTagParentSelected(){
+  var el=document.getElementById('tag-parent-selected');
+  if(selectedParentTagIds.size===0){el.innerHTML='';return;}
+  el.innerHTML='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">已选父标签</div>'+Array.from(selectedParentTagIds).map(function(key){
+    var display='';
+    if(key.indexOf('tag::')===0){var tid=key.replace('tag::','');display=(tagsData[tid]?tagsData[tid].name:tid);}
+    else if(key.indexOf('::')!==-1){var parts=key.split('::');var c=cases.find(function(x){return x.id===parts[0];});display=(c?c.name:parts[0])+' > '+parts[1];}
+    else{var c=cases.find(function(x){return x.id===key;});display=(c?c.name:key);}
+    return '<span class="tag active" onclick="toggleParentTag(\''+key+'\')">'+display+' ✕</span>';
+  }).join('');
+}
+function getParentIdsFromSelection(){
+  var parentIds=[];
+  selectedParentTagIds.forEach(function(key){
+    if(key.indexOf('tag::')===0){parentIds.push(key.replace('tag::',''));}
+    else if(key.indexOf('::')!==-1){
+      var parts=key.split('::');
+      var caseId=parts[0],tagName=parts[1];
+      var foundTagId=null;
+      Object.entries(tagsData).forEach(function(p){if(p[1].name===tagName)foundTagId=p[0];});
+      parentIds.push(foundTagId||caseId);
+    }else{parentIds.push(key);}
+  });
+  return parentIds;
+}
+async function createConnection(){
+  var name=document.getElementById('tag-name').value.trim();
+  var parentIds=getParentIdsFromSelection();
+  var hasNewName=!!name;
+  var hasChildSelection=selectedChildTagIds.size>0;
+  if(!hasNewName&&!hasChildSelection)return alert('请至少输入新标签名称或选择要连接的现有标签');
+  if((hasNewName||hasChildSelection)&&parentIds.length===0)return alert('请选择至少一个父节点');
+  try{
+    if(hasNewName){
+      await api('/tags',{method:'POST',body:{name:name,parent_ids:parentIds.length>0?parentIds:null}});
+      document.getElementById('tag-name').value='';
+    }
+    if(hasChildSelection){
+      var childIds=Array.from(selectedChildTagIds);
+      for(var i=0;i<childIds.length;i++){
+        var tid=childIds[i];
+        var tag=tagsData[tid];
+        if(!tag)continue;
+        var existing=tag.parent_ids||[];
+        if(tag.parent_id!=null&&existing.indexOf(tag.parent_id)===-1)existing=[tag.parent_id];
+        var merged=existing.slice();
+        parentIds.forEach(function(pid){if(merged.indexOf(pid)===-1)merged.push(pid);});
+        await api('/tags/'+tid,{method:'PUT',body:{parent_ids:merged}});
+      }
+      selectedChildTagIds.clear();
+      renderChildTagMultiSelect((document.getElementById('tag-child-search')||{}).value||'');
+      renderChildTagSelected();
+    }
+    var searchEl=document.getElementById('tag-parent-search');
+    if(searchEl)searchEl.value='';
+    document.getElementById('tag-child-search').value='';
+    selectedParentTagIds.clear();
+    await renderTagsTab();
+    await refresh();
+  }catch(e){alert('操作失败: '+e.message);}
+}
+async function deleteTag(tagId){
+  if(!confirm('确定删除这个标签？如果有子标签或正在被案例使用，将无法删除。'))return;
+  try{
+    await api('/tags/'+tagId,{method:'DELETE'});
+    await renderTagsTab();
+    await refresh();
+  }catch(e){alert('删除失败: '+e.message);}
+}
+
+async function createNebula(){
+  var name=document.getElementById('nebula-name').value.trim();
+  if(!name)return alert('请输入星云名称');
+  try{
+    await api('/nebulas',{method:'POST',body:{name:name,case_ids:[],concept_ids:[]}});
+    document.getElementById('nebula-name').value='';
+    await refresh();
+    renderNebulaList();
+  }catch(e){alert('创建失败: '+e.message);}
+}
+
+function renderNebulaList(){
+  var filter=(document.getElementById('nebula-search')?.value||'').toLowerCase();
+  var filtered=nebulas.filter(function(n){return!filter||n.name.toLowerCase().indexOf(filter)!==-1;});
+  var html=filtered.length?filtered.map(function(n){
+    var caseCount=n.case_ids?n.case_ids.length:0;
+    var conceptCount=n.concept_ids?n.concept_ids.length:0;
+    var isActive=activeNebulaId===n.id;
+    return '<div class="result-card" style="cursor:pointer;border-left:'+(isActive?'3px solid var(--accent)':'1px solid var(--border)')+'" onclick="switchNebula(\''+n.id+'\')"><div style="display:flex;justify-content:space-between;align-items:start"><div><div style="font-weight:500;font-size:14px;color:'+(isActive?'var(--accent)':'var(--text-primary)')+'">'+n.name+'</div><div style="color:var(--text-muted);font-size:11px;margin-top:4px">'+caseCount+' 个案例，'+conceptCount+' 个概念</div></div><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();editNebula(\''+n.id+'\')" style="font-size:10px;padding:4px 8px">编辑</button><button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteNebula(\''+n.id+'\')" style="font-size:10px;padding:4px 8px">删除</button></div></div></div>';
+  }).join(''):'<div style="color:var(--text-muted);padding:24px;text-align:center">暂无星云</div>';
+  document.getElementById('nebula-list').innerHTML=html;
+}
+
+function switchNebula(id){
+  if(activeNebulaId===id){activeNebulaId=null;}else{activeNebulaId=id;}
+  refresh();
+}
+
+function editNebula(id){
+  var nebula=nebulas.find(function(x){return x.id===id;});
+  if(!nebula)return;
+  editingNebulaId=id;
+  document.getElementById('detail-title').textContent='编辑星云';
+  var h='<div class="edit-row"><label>名称</label><input class="input" id="edit-nebula-name" value="'+(nebula.name||'')+'"></div>';
+  h+='<div class="edit-row"><label>包含的案例</label><div id="nebula-case-selector" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:6px;background:rgba(255,255,255,.02);margin-top:6px"></div></div>';
+  h+='<div class="edit-row"><label>包含的概念</label><div id="nebula-concept-selector" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:6px;background:rgba(255,255,255,.02);margin-top:6px"></div></div>';
+  h+='<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveNebulaEdit()">保存</button><button class="btn btn-ghost" onclick="closeDetail()" style="margin-left:8px">取消</button></div>';
+  document.getElementById('detail-content').innerHTML=h;
+  document.getElementById('detail-panel').style.display='block';
+  renderNebulaCaseSelector(nebula.case_ids||[]);
+  renderNebulaConceptSelector(nebula.concept_ids||[]);
+}
+
+var editingNebulaId=null,selectedNebulaCases=new Set(),selectedNebulaConcepts=new Set();
+
+function renderNebulaCaseSelector(selectedIds){
+  selectedNebulaCases=new Set(selectedIds||[]);
+  var html=cases.map(function(c){
+    var sel=selectedNebulaCases.has(c.id);
+    return '<div class="pick-item '+(sel?'selected':'')+'" onclick="toggleNebulaCase(\''+c.id+'\')" style="padding:6px 8px"><div class="check">'+(sel?'✔':'')+'</div><div style="font-size:12px">'+c.name+'</div></div>';
+  }).join('');
+  document.getElementById('nebula-case-selector').innerHTML=html||'<div style="color:var(--text-muted);font-size:11px;padding:8px;text-align:center">暂无案例</div>';
+}
+
+function renderNebulaConceptSelector(selectedIds){
+  selectedNebulaConcepts=new Set(selectedIds||[]);
+  var html=concepts.map(function(c){
+    var sel=selectedNebulaConcepts.has(c.id);
+    return '<div class="pick-item '+(sel?'selected':'')+'" onclick="toggleNebulaConcept(\''+c.id+'\')" style="padding:6px 8px"><div class="check">'+(sel?'✔':'')+'</div><div style="font-size:12px">'+c.name+'</div></div>';
+  }).join('');
+  document.getElementById('nebula-concept-selector').innerHTML=html||'<div style="color:var(--text-muted);font-size:11px;padding:8px;text-align:center">暂无概念</div>';
+}
+
+function toggleNebulaCase(id){if(selectedNebulaCases.has(id))selectedNebulaCases.delete(id);else selectedNebulaCases.add(id);renderNebulaCaseSelector(Array.from(selectedNebulaCases));}
+function toggleNebulaConcept(id){if(selectedNebulaConcepts.has(id))selectedNebulaConcepts.delete(id);else selectedNebulaConcepts.add(id);renderNebulaConceptSelector(Array.from(selectedNebulaConcepts));}
+
+async function saveNebulaEdit(){
+  if(!editingNebulaId)return;
+  var update={};
+  var name=document.getElementById('edit-nebula-name').value.trim();
+  if(name)update.name=name;
+  update.case_ids=Array.from(selectedNebulaCases);
+  update.concept_ids=Array.from(selectedNebulaConcepts);
+  try{
+    await api('/nebulas/'+editingNebulaId,{method:'PUT',body:update});
+    editingNebulaId=null;
+    selectedNebulaCases.clear();
+    selectedNebulaConcepts.clear();
+    closeDetail();
+    await refresh();
+    renderNebulaList();
+  }catch(e){alert('保存失败: '+e.message);}
+}
+
+async function deleteNebula(id){
+  if(!confirm('确定删除这个星云？'))return;
+  try{
+    await api('/nebulas/'+id,{method:'DELETE'});
+    if(activeNebulaId===id)activeNebulaId=null;
+    await refresh();
+    renderNebulaList();
+  }catch(e){alert('删除失败: '+e.message);}
+}
+
+async function exportData(format){
+  try{
+    var url='/api/export/'+format;
+    var response=await fetch(url);
+    if(!response.ok)throw new Error('导出失败');
+    var blob=await response.blob();
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g,'')||'export.'+format;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }catch(e){alert('导出失败: '+e.message);}
+}
+
+async function handleImportFile(e){
+  var file=e.target.files[0];
+  if(!file)return;
+  var mode=document.getElementById('import-mode').value;
+  var statusEl=document.getElementById('import-status');
+  statusEl.textContent='正在读取文件…';
+  try{
+    var text=await file.text();
+    var data=JSON.parse(text);
+    await api('/import/json',{method:'POST',body:{cases:data.cases,concepts:data.concepts,tags:data.tags,nebulas:data.nebulas,merge_mode:mode}});
+    statusEl.textContent='导入成功！正在刷新…';
+    document.getElementById('import-file-input').value='';
+    await refresh();
+    setTimeout(function(){statusEl.textContent='';},2000);
+  }catch(e){statusEl.textContent='导入失败: '+e.message;statusEl.style.color='var(--danger)';}
+}
+
+async function createSnapshot(){
+  try{
+    var name=prompt('请输入快照名称（可选）:');
+    var result=await api('/snapshots',{method:'POST',body:{name:name||null}});
+    alert('快照创建成功！');
+    await listSnapshots();
+  }catch(e){alert('创建快照失败: '+e.message);}
+}
+
+async function listSnapshots(){
+  try{
+    var data=await api('/snapshots');
+    var listEl=document.getElementById('snapshot-list');
+    if(!data.snapshots||data.snapshots.length===0){
+      listEl.innerHTML='<div style="color:var(--text-muted);font-size:12px">暂无快照</div>';
+      return;
+    }
+    listEl.innerHTML=data.snapshots.map(function(s){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--border);font-size:12px"><span>'+s.name+'</span><div><button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="restoreSnapshot(\''+s.id+'\')">恢复</button><button class="btn btn-ghost" style="padding:4px 8px;font-size:11px;margin-left:4px" onclick="deleteSnapshot(\''+s.id+'\')">删除</button></div></div>';
+    }).join('');
+  }catch(e){console.error('获取快照列表失败:',e);}
+}
+
+async function restoreSnapshot(id){
+  if(!confirm('确定恢复此快照？当前数据将被覆盖。'))return;
+  try{
+    await api('/snapshots/'+id+'/restore',{method:'POST'});
+    alert('快照恢复成功！');
+    await refresh();
+  }catch(e){alert('恢复快照失败: '+e.message);}
+}
+
+async function deleteSnapshot(id){
+  if(!confirm('确定删除此快照？'))return;
+  try{
+    await api('/snapshots/'+id,{method:'DELETE'});
+    listSnapshots();
+  }catch(e){alert('删除快照失败: '+e.message);}
+}
+
+function updateStats(){
+  var t=new Set(cases.flatMap(function(c){return c.tags||[];})).size;
+  document.getElementById('stats-cases').textContent=cases.length+' cases';
+  document.getElementById('stats-tags').textContent=t+' tags';
+  document.getElementById('stats-edges').textContent=graphData.edges.length+' links';
+}
+
+async function refresh(){
+  cases=await api('/cases');
+  concepts=await api('/concepts');
+  nebulas=await api('/nebulas');
+  tagsData=await api('/tags');
+  var graphUrl='/graph'+(activeNebulaId?'?active_nebula_id='+activeNebulaId:'');
+  graphData=await api(graphUrl);
+  renderGraph();
+  renderTagCloud();
+  renderCaseList();
+  updateStats();
+  highlightByTags();
+  if(document.querySelector('.tab[data-tab="hybrid"]')?.classList.contains('active')){renderHybridTab();highlightHybridNodes();}
+  if(document.querySelector('.tab[data-tab="tags"]')?.classList.contains('active')){renderTagsTab();}
+  if(document.querySelector('.tab[data-tab="nebula"]')?.classList.contains('active')){renderNebulaList();}
+  if(document.querySelector('.tab[data-tab="data"]')?.classList.contains('active')){listSnapshots();}
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){closeDetail();closeSearch();closeHybrid();}
+  if(e.key==='Enter'&&e.ctrlKey&&document.getElementById('search-input')===document.activeElement)doSearch();
+});
+window.addEventListener('resize',function(){if(simulation)renderGraph();});
+
+init();
+</script>
+</body>
+</html>
