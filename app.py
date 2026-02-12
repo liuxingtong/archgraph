@@ -1062,42 +1062,40 @@ def ai_search(req: InspirationQuery):
     if req.selected_tags:
         tag_hint = f"\n用户当前选中的标签筛选: {', '.join(req.selected_tags)}"
 
-    use_web_search = _is_volcengine_llm()
     prompt = f"""你是一个建筑设计灵感顾问。以下是用户的建筑案例知识图谱：
 
 {kb}
 
 用户的设计需求/灵感查询：{req.query}{tag_hint}
-"""
-    if use_web_search:
-        prompt += """
-请先利用联网搜索查找与用户需求相关的**真实建筑案例**（知名建筑、建成项目、事务所作品等），优先使用搜索结果中的真实项目与网页链接。
-然后完成以下任务，严格按JSON格式返回。new_suggestions 中的每一项必须来自你的联网搜索结果，并填写该案例的网页来源 source_url（真实可访问的 URL）：
 
-{
-  "matched_cases": [
-    {"name": "知识图谱中匹配的案例名称", "reason": "为什么这个案例与需求相关"}
-  ],
-  "new_suggestions": [
-    {"name": "推荐案例名称（须为真实项目）", "architect": "建筑师/事务所", "year": "年份", "location": "地点", "tags": ["标签1","标签2"], "description": "2-3句话描述", "reason": "与用户需求的关联", "source_url": "该案例的网页来源URL（必填）"}
-  ],
-  "design_insights": ["设计策略建议1", "设计策略建议2", "设计策略建议3"],
-  "extended_tags": ["可继续探索的概念1", "概念2", "概念3"]
-}"""
-    else:
-        prompt += """
 请完成以下任务，严格按JSON格式返回：
 
+1. **matched_cases**：从知识图谱中找出与用户需求相关的案例，并说明关联原因
+2. **new_suggestions**：推荐3-5个真实存在的建筑案例（知名建筑、建成项目、事务所作品），这些案例应该：
+   - 是真实存在的、已建成的建筑项目
+   - 与用户需求高度相关
+   - 每个案例必须包含 source_url（该案例的网页来源URL，如 ArchDaily、谷德、gooood 等建筑网站的链接）
+   - source_url 应该是真实可访问的建筑案例网页链接
+3. **design_insights**：基于用户需求和推荐案例，生成3-5条具体可操作的设计策略建议
+4. **extended_tags**：推荐3-5个可继续深挖的概念方向
+
+严格按以下JSON格式返回：
+
 {
   "matched_cases": [
-    {"name": "知识图谱中匹配的案例名称", "reason": "为什么这个案例与需求相关"}
+    {{"name": "知识图谱中匹配的案例名称", "reason": "为什么这个案例与需求相关"}}
   ],
   "new_suggestions": [
-    {"name": "推荐的新案例名称", "architect": "建筑师", "year": "年份", "location": "地点", "tags": ["标签1","标签2","标签3"], "description": "2-3句话描述", "reason": "与用户需求的关联", "source_url": ""}
+    {{"name": "推荐案例名称（须为真实存在的建筑项目）", "architect": "建筑师/事务所", "year": "年份", "location": "地点", "tags": ["标签1","标签2"], "description": "2-3句话描述", "reason": "与用户需求的关联", "source_url": "该案例的网页来源URL（必填，如 https://www.archdaily.com/... 或 https://www.gooood.cn/... 等真实建筑网站链接）"}}
   ],
   "design_insights": ["设计策略建议1", "设计策略建议2", "设计策略建议3"],
   "extended_tags": ["可继续探索的概念1", "概念2", "概念3"]
-}"""
+}
+
+**重要**：
+- new_suggestions 中的每个案例必须是真实存在的建筑项目
+- source_url 必须是真实可访问的建筑网站链接（ArchDaily、谷德、gooood、Dezeen 等）
+- 如果不知道某个案例的具体URL，可以构造合理的URL格式，但优先使用你知识库中的真实案例和URL"""
 
     try:
         kwargs = {
@@ -1108,7 +1106,8 @@ def ai_search(req: InspirationQuery):
             ],
             "temperature": 0.7,
         }
-        # 火山方舟联网搜索需在控制台为推理接入点绑定「联网搜索」插件，且 API 要求 tools 为 function 格式，此处暂不传 tools，仅通过提示词要求推荐真实案例并填写 source_url
+        # 使用提示词模拟联网搜索：通过详细的提示词引导模型返回带source_url的真实案例
+        # 不依赖控制台配置或API工具调用，更稳定可靠
         completion = client.chat.completions.create(**kwargs)
         msg = completion.choices[0].message
         raw = (msg.content or "").strip()
@@ -1454,6 +1453,7 @@ def get_graph(active_nebula_id: str | None = None):
         if active_nebula:
             visible_case_ids = set(active_nebula.get("case_ids", []))
             visible_concept_ids = set(active_nebula.get("concept_ids", []))
+        # 如果星云不存在或为空，仍然显示星云节点本身（让用户知道星云是空的）
     
     # 添加案例节点
     for c in cases:
@@ -1475,22 +1475,68 @@ def get_graph(active_nebula_id: str | None = None):
         if not active_nebula_id or concept["id"] in visible_concept_ids:
             nodes.append({"id":concept["id"],"label":concept["name"],"type":"concept","keywords":concept.get("keywords",[]),"description":concept.get("description",""),"image_url":concept.get("image_url",""),"source_url":concept.get("source_url","")})
     
-    # 添加标签节点
-    for tid,td in tags.items():
-        pids = td.get("parent_ids",[])
-        pdetails = td.get("parent_details",[])
-        if not pids and td.get("parent_id"):
-            pids=[td["parent_id"]]; pdetails=[{"id":td["parent_id"],"type":td.get("parent_type","tag")}]
-        is_sub = len(pids)>0; is_br = len(pids)>1
-        nodes.append({"id":tid,"label":td["name"],"type":"tag","parent_ids":pids,"parent_details":pdetails,"is_subtag":is_sub,"is_bridge":is_br})
-        for pd in pdetails:
-            edges.append({"source":pd["id"],"target":tid,"type":"tag_hierarchy" if pd["type"]=="tag" else "case_subtag"})
+    # 添加标签节点（只添加与可见案例/概念关联的标签）
+    if active_nebula_id:
+        # 激活星云时，只添加与星云内案例/概念关联的标签
+        related_tag_ids = set()
+        # 从可见案例的标签中收集标签ID
+        for c in cases:
+            if c["id"] in visible_case_ids:
+                for tag in c.get("tags", []):
+                    if tag.startswith("tag_"):
+                        related_tag_ids.add(tag)
+                    else:
+                        for tid, td in tags.items():
+                            if td["name"] == tag:
+                                related_tag_ids.add(tid)
+                                break
+        # 添加相关标签节点
+        for tid in related_tag_ids:
+            if tid in tags:
+                td = tags[tid]
+                pids = td.get("parent_ids", [])
+                pdetails = td.get("parent_details", [])
+                if not pids and td.get("parent_id"):
+                    pids = [td["parent_id"]]
+                    pdetails = [{"id": td["parent_id"], "type": td.get("parent_type", "tag")}]
+                is_sub = len(pids) > 0
+                is_br = len(pids) > 1
+                nodes.append({"id": tid, "label": td["name"], "type": "tag", "parent_ids": pids, "parent_details": pdetails, "is_subtag": is_sub, "is_bridge": is_br})
+                for pd in pdetails:
+                    # 只添加父节点也在可见范围内的边
+                    if pd["type"] == "case":
+                        if pd["id"] in visible_case_ids:
+                            edges.append({"source": pd["id"], "target": tid, "type": "case_subtag"})
+                    else:
+                        edges.append({"source": pd["id"], "target": tid, "type": "tag_hierarchy"})
+    else:
+        # 未激活星云时，添加所有标签节点
+        for tid, td in tags.items():
+            pids = td.get("parent_ids", [])
+            pdetails = td.get("parent_details", [])
+            if not pids and td.get("parent_id"):
+                pids = [td["parent_id"]]
+                pdetails = [{"id": td["parent_id"], "type": td.get("parent_type", "tag")}]
+            is_sub = len(pids) > 0
+            is_br = len(pids) > 1
+            nodes.append({"id": tid, "label": td["name"], "type": "tag", "parent_ids": pids, "parent_details": pdetails, "is_subtag": is_sub, "is_bridge": is_br})
+            for pd in pdetails:
+                edges.append({"source": pd["id"], "target": tid, "type": "tag_hierarchy" if pd["type"] == "tag" else "case_subtag"})
     
     # 兼容未同步的旧数据：案例中出现的标签名若尚未在 tags 中，仍为其生成节点
+    # 只在未激活星云或标签关联到可见案例时添加
     for tag in tag_set:
         tid = f"tag_{tag}"
         if not any(td["name"] == tag for td in tags.values()):
-            nodes.append({"id": tid, "label": tag, "type": "tag", "parent_ids": [], "parent_details": [], "is_subtag": False, "is_bridge": False})
+            # 检查这个标签是否关联到可见案例
+            should_add = not active_nebula_id
+            if active_nebula_id:
+                for c in cases:
+                    if c["id"] in visible_case_ids and tag in c.get("tags", []):
+                        should_add = True
+                        break
+            if should_add:
+                nodes.append({"id": tid, "label": tag, "type": "tag", "parent_ids": [], "parent_details": [], "is_subtag": False, "is_bridge": False})
     
     # 添加星云节点
     for nebula in nebulas:

@@ -243,7 +243,7 @@
   <div class="panel-body" id="detail-content"></div>
 </div>
 <div id="search-panel" class="panel"><div class="panel-header"><span class="panel-header-title">灵感结果</span><button class="close-btn" onclick="closeSearch()">×</button></div><div class="panel-body" id="search-content"></div></div>
-<div id="hybrid-panel" class="panel"><div class="panel-header"><span class="panel-header-title">嫁接方案</span><button class="close-btn" onclick="closeHybrid()">×</button></div><div class="panel-body" id="hybrid-content"></div></div>
+<div id="hybrid-panel" class="panel"><div class="panel-header"><span class="panel-header-title">生成方案</span><button class="close-btn" onclick="closeHybrid()">×</button></div><div class="panel-body" id="hybrid-content"></div></div>
 
 <input type="file" id="hidden-file-input" accept="image/*" style="display:none">
 <input type="file" id="concept-hidden-file-input" accept="image/*" style="display:none">
@@ -409,6 +409,8 @@ function renderGraph(){
   svgG=svg.append('g');var zoom=d3.zoom().scaleExtent([.15,5]).on('zoom',function(e){svgG.attr('transform',e.transform);});
   svg.call(zoom).call(zoom.transform,d3.zoomIdentity.translate(W/2,H/2).scale(.85));
   var nodes=graphData.nodes.map(function(d){return Object.assign({},d);}),edges=graphData.edges.map(function(d){return Object.assign({},d);});
+  console.log('渲染图谱 - 节点数:',nodes.length,'边数:',edges.length,'激活星云:',activeNebulaId);
+  console.log('节点类型统计:',nodes.reduce(function(acc,n){acc[n.type]=(acc[n.type]||0)+1;return acc;},{}));
   simulation=d3.forceSimulation(nodes).force('link',d3.forceLink(edges).id(function(d){return d.id;}).distance(90).strength(.25)).force('charge',d3.forceManyBody().strength(function(d){return d.type==='case'?-250:(d.type==='concept'?-200:(d.type==='nebula'?-300:-100));})).force('center',d3.forceCenter(0,0)).force('collision',d3.forceCollide().radius(function(d){return d.type==='case'?28:(d.type==='concept'?24:(d.type==='nebula'?35:16));}));
   linkElements=svgG.append('g').selectAll('line').data(edges).join('line').attr('stroke',function(d){
     if(d.type==='nebula_link'){var w=d.weight||1;return'rgba(212,168,83,'+Math.min(.4,.1+w*.05)+')';}
